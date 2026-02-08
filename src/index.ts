@@ -3,10 +3,8 @@ import Logger from "@Utils/Logger";
 import {loadMiddlewares} from "@Utils/MiddlewareLoader";
 import {loadRoutes} from "@Utils/RouteLoader";
 import createHttpClient from "@API/HttpClient";
-import {loadCronJobs} from "@Utils/CronJobsLoader";
 import {createMongooseConnection} from "@API/Mongoose";
 import {loadCommands} from "@Utils/CommandsLoader";
-import {loadWorker} from "@Utils/WorkerLoader";
 
 dotenv.config();
 

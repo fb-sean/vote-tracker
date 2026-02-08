@@ -1,29 +1,32 @@
 import type {TIncomingMessage, TRoute, TServerResponse} from "@Types/HttpClient";
 import {Context} from "@Utils/Context";
-import {APIInteraction, ComponentType, MessageFlags, InteractionType} from "discord-api-types/v10";
+import {APIInteraction, ComponentType, MessageFlags} from "discord-api-types/v10";
 import {DiscordClient} from "@API/DiscordClient";
 import Logger from "@Utils/Logger";
 import {
-    handleSetupBot,
-    handleSetupServer,
-    handleSetupCancel,
+    handleSetupAddReward,
+    handleSetupAddRewardModal,
     handleSetupBack,
-    handleSetupNext,
-    handleSetupEnterEntityId,
+    handleSetupBot,
+    handleSetupCancel,
     handleSetupChannelSelect,
-    handleSetupEnterWebhook,
-    handleSetupTestChannel,
     handleSetupEditFirstVote,
     handleSetupEditVote,
-    handleSetupAddReward,
-    handleSetupRemoveReward,
-    handleSetupFinish,
+    handleSetupEnterEntityId,
+    handleSetupEnterWebhook,
     handleSetupEntityIdModal,
-    handleSetupWebhookModal,
+    handleSetupFinish,
     handleSetupFirstVoteModal,
+    handleSetupNext,
+    handleSetupRemoveReward,
+    handleSetupServer,
+    handleSetupTestChannel,
     handleSetupVoteModal,
-    handleSetupAddRewardModal,
+    handleSetupWebhookModal,
 } from "@Handlers/SetupHandlers";
+import {handleListEdit, handleListDump,} from "@Handlers/ListHandlers";
+import {createSetupState, getAllSetupsForServer, buildSetupList} from "@Utils/SetupManager";
+import {buildEntitySelectionStep} from "@Utils/SetupComponents";
 
 export default class InteractionRoute implements TRoute {
     method = 'POST';
@@ -74,6 +77,14 @@ export default class InteractionRoute implements TRoute {
 
             if (parts[0] === 'setup') {
                 return this.handleSetupComponent(ctx, parts);
+            }
+
+            if (parts[0] === 'list') {
+                return this.handleListComponent(ctx, parts);
+            }
+
+            if (parts[0] === 'help') {
+                return this.handleHelpComponent(ctx, parts);
             }
 
             const button = DiscordClient.getInstance().getButton(parts[0]);
@@ -172,7 +183,9 @@ export default class InteractionRoute implements TRoute {
                     break;
                 case 'remove':
                     if (parts[2] === 'reward') {
-                        return handleSetupRemoveReward(ctx, setupId);
+                        const rewardIndex = parts[4];
+
+                        return handleSetupRemoveReward(ctx, setupId, rewardIndex);
                     }
                     break;
                 case 'finish':
@@ -198,13 +211,13 @@ export default class InteractionRoute implements TRoute {
         const components = (ctx.interaction.data as any).components || [];
 
         const getValue = (customId: string): string => {
-            const component = components.find((c: any) => c.components?.[0]?.custom_id === customId);
-            return component?.components?.[0]?.value || '';
+            const component = components.find((c: any) => c.component?.custom_id === customId || c.components?.[0]?.custom_id === customId);
+            return component?.component?.value || component?.components?.[0]?.value || '';
         };
 
         const getSelectValue = (customId: string): string => {
-            const component = components.find((c: any) => c.components?.[0]?.custom_id === customId);
-            const values = component?.components?.[0]?.values;
+            const component = components.find((c: any) => c.component?.custom_id === customId || c.components?.[0]?.custom_id === customId);
+            const values = component?.component?.values || component?.components?.[0]?.values;
             return values && values.length > 0 ? values[0] : '';
         };
 
@@ -225,6 +238,62 @@ export default class InteractionRoute implements TRoute {
             }
         } catch (error) {
             Logger.error(`Error handling setup modal ${modalType}: ${error}`, 'SETUP');
+            console.log(error);
+            return ctx.reply({content: 'An error occurred while processing your request.'});
+        }
+    }
+
+    async handleListComponent(ctx: Context, parts: string[]) {
+        const action = parts[1];
+
+        try {
+            switch (action) {
+                case 'edit':
+                    const setupId = parts[2];
+                    const serverId = parts[3];
+                    return handleListEdit(ctx, setupId, serverId);
+                case 'dump':
+                    const dumpSetupId = parts[2];
+                    return handleListDump(ctx, dumpSetupId);
+                default:
+                    return ctx.reply({content: 'Unknown list action.'});
+            }
+        } catch (error) {
+            Logger.error(`Error handling list component ${action}: ${error}`, 'LIST');
+            console.log(error);
+            return ctx.reply({content: 'An error occurred while processing your request.'});
+        }
+    }
+
+    async handleHelpComponent(ctx: Context, parts: string[]) {
+        const action = parts[1];
+
+        try {
+            switch (action) {
+                case 'setup':
+                    if (!ctx.isInGuild) {
+                        return ctx.reply({content: 'Setup can only be used in a server.'});
+                    }
+                    const setupId = await createSetupState(ctx.interaction.guild_id!, ctx.user.id);
+                    return ctx.update({
+                        ...buildEntitySelectionStep(setupId),
+                        flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
+                    });
+                case 'list':
+                    if (!ctx.isInGuild) {
+                        return ctx.reply({content: 'List can only be used in a server.'});
+                    }
+                    const setups = await getAllSetupsForServer(ctx.interaction.guild_id!);
+                    const listPayload = buildSetupList(setups, ctx.interaction.guild_id!);
+                    return ctx.update({
+                        ...listPayload,
+                        flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
+                    });
+                default:
+                    return ctx.reply({content: 'Unknown help action.'});
+            }
+        } catch (error) {
+            Logger.error(`Error handling help component ${action}: ${error}`, 'HELP');
             console.log(error);
             return ctx.reply({content: 'An error occurred while processing your request.'});
         }

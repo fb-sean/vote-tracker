@@ -1,5 +1,4 @@
 import * as http from "node:http";
-import type {TDiscordUserAuthData, TUserSettings} from "@Types/Discord";
 
 export type TIncomingMessage = http.IncomingMessage & {
     path?: string;

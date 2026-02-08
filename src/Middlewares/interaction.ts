@@ -1,7 +1,7 @@
 import type {Middleware, TIncomingMessage, TMiddlewareNext, TServerResponse} from "@Types/HttpClient";
 import {verifyKey} from 'discord-interactions';
 import {getHeaders, Response} from "@Utils/Http";
-import {InteractionType, InteractionResponseType} from "discord-api-types/v10";
+import {InteractionResponseType, InteractionType} from "discord-api-types/v10";
 import Logger from "@Utils/Logger";
 
 export default class InteractionMiddleware implements Middleware {

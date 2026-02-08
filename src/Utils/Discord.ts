@@ -1,21 +1,7 @@
-import {
-    APIInteraction,
-    APIMessage,
-    ButtonStyle,
-    ComponentType, MessageFlags,
-    PermissionFlagsBits,
-    RESTGetAPIUserResult,
-    RESTPostOAuth2AccessTokenResult,
-    Routes
-} from "discord-api-types/v10";
+import {APIInteraction, RESTGetAPIUserResult, RESTPostOAuth2AccessTokenResult} from "discord-api-types/v10";
 import {URLSearchParams} from "url";
 import {isErrorResponse, TErrorResponse} from "@Types/Discord";
 import Logger from "@Utils/Logger";
-import {DiscordClient} from "@API/DiscordClient";
-import Redis from "@API/RedisCache";
-import RedisQueue from "@API/RedisQueue";
-import {EWorkerJobs} from "@Types/RedisQueue";
-import {Context} from "@Utils/Context";
 
 export function buildAvatarUrl(userId: string, avatar: Nullable<string>): string {
     if (!avatar) { // @ts-ignore

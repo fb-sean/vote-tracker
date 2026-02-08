@@ -1,36 +1,34 @@
 import {Context} from "@Utils/Context";
 import {
-    APIMessageComponentGuildInteraction,
+    APIMessageChannelSelectInteractionData,
     ComponentType,
     MessageFlags,
-    Routes,
-    APIMessageRoleSelectInteractionData,
-    APIMessageChannelSelectInteractionData,
     RESTPostAPIChannelMessageJSONBody,
+    Routes,
 } from "discord-api-types/v10";
 import {DiscordClient} from "@API/DiscordClient";
 import {
-    getSetupState,
-    updateSetupState,
-    deleteSetupState,
-    previousStep,
-    nextStep,
-    generateAuthToken,
-    saveSetupToDatabase,
     countSetupsForServer,
-    type TSetupState
+    deleteSetupState,
+    generateAuthToken,
+    getSetupState,
+    nextStep,
+    previousStep,
+    saveSetupToDatabase,
+    type TSetupState,
+    updateSetupState
 } from "@Utils/SetupManager";
 import {
-    buildEntityIdStep,
+    buildAddRewardModal,
     buildChannelAndWebhookStep,
-    buildMessagesStep,
-    buildRewardsStep,
     buildCompleteStep,
     buildEntityIdModal,
+    buildEntityIdStep,
     buildExternalWebhookModal,
     buildFirstVoteMessageModal,
+    buildMessagesStep,
+    buildRewardsStep,
     buildVoteMessageModal,
-    buildAddRewardModal,
 } from "@Utils/SetupComponents";
 import Redis from "@API/RedisCache";
 
@@ -42,7 +40,7 @@ function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: num
 }
 
 export async function handleSetupBot(ctx: Context, setupId: string) {
-    const state = await updateSetupState(setupId, {entity_type: 'bot'});
+    const state = await updateSetupState(setupId, {entity_type: 'bot', current_step: 1});
     if (!state) {
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
@@ -51,12 +49,17 @@ export async function handleSetupBot(ctx: Context, setupId: string) {
 }
 
 export async function handleSetupServer(ctx: Context, setupId: string) {
-    const state = await updateSetupState(setupId, {entity_type: 'server'});
+    const serverId = ctx.interaction.guild_id;
+    if (!serverId) {
+        return ctx.reply({content: 'This command can only be used in a server.'});
+    }
+
+    const state = await updateSetupState(setupId, {entity_type: 'server', entity_id: serverId, current_step: 2});
     if (!state) {
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
-    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'server')));
+    return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
 }
 
 export async function handleSetupCancel(ctx: Context, setupId: string) {
@@ -144,11 +147,19 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
-    if (state.current_step === 2 && !state.entity_id) {
-        return ctx.reply({content: 'Please enter an entity ID first.'});
+    if (!state.entity_id) {
+        return ctx.reply({content: 'Please enter your bot or server ID first.'});
     }
 
     if (state.current_step === 4) {
+        if (state.editing_id) {
+            const next = await nextStep(setupId);
+            if (!next) {
+                return ctx.reply({content: 'Cannot proceed further.'});
+            }
+            return refreshCurrentStep(ctx, setupId, next);
+        }
+
         const authToken = await generateAuthToken();
         const updated = await updateSetupState(setupId, {auth_token: authToken});
         if (!updated) {
@@ -158,10 +169,7 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
         const webhookUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/webhook/vote`;
         const maskedToken = authToken.substring(0, 8) + '...' + authToken.substring(authToken.length - 4);
 
-        return ctx.update({
-            ...buildCompleteStep(setupId, updated, webhookUrl, maskedToken),
-            flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
-        });
+        return ctx.update(buildPayload(buildCompleteStep(setupId, updated, webhookUrl, maskedToken)));
     }
 
     const next = await nextStep(setupId);
@@ -202,12 +210,18 @@ export async function handleSetupEnterWebhook(ctx: Context, setupId: string) {
 export async function handleSetupTestChannel(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state || !state.channel_id) {
-        return ctx.reply({content: 'No channel set to test.'});
+        return ctx.reply({
+            content: 'No channel set to test.',
+            flags: MessageFlags.Ephemeral
+        });
     }
 
     const cooldown = await Redis.getInstance().get('vote-tracker:test:cooldown:' + state.channel_id);
     if (cooldown) {
-        return ctx.reply({content: 'Test message already sent in the last 2 minutes. Please wait for 2 minutes before sending another test message.'});
+        return ctx.reply({
+            content: 'Test message already sent in the last 2 minutes. Please wait for 2 minutes before sending another test message.',
+            flags: MessageFlags.Ephemeral
+        });
     }
 
     await Redis.getInstance().set('vote-tracker:test:cooldown:' + state.channel_id, true, 2 * 60)
@@ -266,18 +280,19 @@ export async function handleSetupAddReward(ctx: Context, setupId: string) {
     return ctx.showModal(buildAddRewardModal(setupId));
 }
 
-export async function handleSetupRemoveReward(ctx: Context, setupId: string) {
+export async function handleSetupRemoveReward(ctx: Context, setupId: string, rewardIndex: string) {
     const state = await getSetupState(setupId);
     if (!state) {
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
-    if (state.rewards.length === 0) {
-        return ctx.reply({content: 'No rewards to remove.'});
+    const index = parseInt(rewardIndex);
+    if (isNaN(index) || index < 0 || index >= state.rewards.length) {
+        return ctx.reply({content: 'Invalid reward index.'});
     }
 
     const updated = await updateSetupState(setupId, {
-        rewards: state.rewards.slice(0, -1),
+        rewards: state.rewards.filter((_, i) => i !== index),
     });
     if (!updated) {
         return ctx.reply({content: 'Setup session expired.'});
@@ -290,6 +305,26 @@ export async function handleSetupFinish(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
         return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    if (state.editing_id) {
+        const success = await saveSetupToDatabase(setupId);
+        if (!success) {
+            return ctx.reply({content: '❌ Failed to update setup. Please try again.'});
+        }
+
+        return ctx.update(buildPayload({
+            components: [
+                {
+                    type: ComponentType.TextDisplay,
+                    content: '# ✅ Changes Saved!',
+                },
+                {
+                    type: ComponentType.TextDisplay,
+                    content: 'Your vote tracking setup has been updated successfully!',
+                },
+            ],
+        }));
     }
 
     const existingCount = await countSetupsForServer(state.server_id);
@@ -322,18 +357,15 @@ export async function handleSetupFinish(ctx: Context, setupId: string) {
 
 export async function handleSetupEntityIdModal(ctx: Context, setupId: string, entityId: string) {
     if (!entityId || entityId.trim().length === 0) {
-        return ctx.reply({content: 'Entity ID cannot be empty.'});
+        return ctx.reply({content: 'ID cannot be empty.'});
     }
 
-    const state = await updateSetupState(setupId, {entity_id: entityId.trim()});
+    const state = await updateSetupState(setupId, {entity_id: entityId.trim(), current_step: 2});
     if (!state) {
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
-    return ctx.update({
-        ...buildChannelAndWebhookStep(setupId, state),
-        flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
-    });
+    return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
 }
 
 export async function handleSetupWebhookModal(ctx: Context, setupId: string, webhookUrl: string) {
@@ -352,10 +384,7 @@ export async function handleSetupWebhookModal(ctx: Context, setupId: string, web
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
-    return ctx.update({
-        ...buildChannelAndWebhookStep(setupId, state),
-        flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
-    });
+    return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
 }
 
 export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, message: string) {

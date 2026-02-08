@@ -18,16 +18,16 @@ export class DiscordClient {
         }).setToken(process.env.DISCORD_CLIENT_TOKEN);
     }
 
+    public get rest(): REST {
+        return this._rest;
+    }
+
     public static getInstance(): DiscordClient {
         if (!DiscordClient._instance) {
             DiscordClient._instance = new DiscordClient();
         }
 
         return DiscordClient._instance;
-    }
-
-    public get rest(): REST {
-        return this._rest;
     }
 
     public addCommand(command: Command) {

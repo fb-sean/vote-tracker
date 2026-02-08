@@ -1,4 +1,4 @@
-import {Queue, Worker, Job} from 'bullmq';
+import {Job, Queue, Worker} from 'bullmq';
 import type {Redis as RedisClient} from 'ioredis';
 import Redis from './RedisCache';
 

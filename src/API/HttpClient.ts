@@ -116,7 +116,7 @@ export class HttpClient {
                     for (let i = 0; i < routeParts.length; i++) {
                         const routePart = routeParts[i];
                         const urlPart = urlParts[i];
-                    
+
                         if (routePart.startsWith(':')) {
                             params[routePart.slice(1)] = urlPart;
                         } else if (routePart !== urlPart) {
@@ -124,7 +124,7 @@ export class HttpClient {
                             break;
                         }
                     }
-                    
+
                     if (matched) {
                         req.params = params;
                         return this._routes[method][route](req, res);

@@ -1,4 +1,10 @@
-import {ComponentType, ButtonStyle, APIModalInteractionResponseCallbackData, RESTPostAPIChannelMessageJSONBody, APIMessageComponent, APIMessageTopLevelComponent} from "discord-api-types/v10";
+import {
+    APIMessageTopLevelComponent,
+    APIModalInteractionResponseCallbackData,
+    ButtonStyle,
+    ComponentType,
+    RESTPostAPIChannelMessageJSONBody
+} from "discord-api-types/v10";
 import {TSetupState} from "@Utils/SetupManager";
 
 export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMessageJSONBody {
@@ -49,6 +55,14 @@ export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMes
 }
 
 export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server'): RESTPostAPIChannelMessageJSONBody {
+    const title = entityType === 'bot' ? 'Enter Your Bot ID' : 'Enter Your Server ID';
+    const description = entityType === 'bot'
+        ? 'Enter the bot ID you want to track votes for.'
+        : 'Enter the server ID you want to track votes for.';
+    const hint = entityType === 'bot'
+        ? '> 💡 You can find this in the URL of your bot page on the voting platform.'
+        : '> 💡 You can find this in the URL of your server page on the voting platform.';
+
     return {
         components: [
             {
@@ -57,11 +71,11 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server')
             },
             {
                 type: ComponentType.TextDisplay,
-                content: `Enter the ${entityType} ID you want to track votes for.`,
+                content: description,
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '> 💡 You can find this in the URL of your bot/server page on the voting platform.',
+                content: hint,
             },
             {
                 type: ComponentType.Separator,
@@ -101,7 +115,7 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server')
 
 export function buildEntityIdModal(setupId: string): APIModalInteractionResponseCallbackData {
     return {
-        title: 'Enter Entity ID',
+        title: 'Enter Your ID',
         custom_id: `setup_modal_entityid_${setupId}`,
         components: [
             {
@@ -111,8 +125,8 @@ export function buildEntityIdModal(setupId: string): APIModalInteractionResponse
                         type: ComponentType.TextInput,
                         style: 1,
                         custom_id: 'entity_id',
-                        label: 'Entity ID',
-                        placeholder: 'Enter the bot or server ID...',
+                        label: 'Your Bot or Server ID',
+                        placeholder: 'Paste your ID here...',
                         required: true,
                         max_length: 100,
                     },
@@ -125,12 +139,43 @@ export function buildEntityIdModal(setupId: string): APIModalInteractionResponse
 export function buildChannelAndWebhookStep(setupId: string, state: TSetupState): RESTPostAPIChannelMessageJSONBody {
     const channelText = state.channel_id ? `✅ Channel set` : 'Select logging channel (optional)';
     const webhookText = state.external_webhook_url ? '✅ External webhook set' : 'Set external webhook URL (optional)';
+    const isEditing = !!state.editing_id;
+
+    const actionRowComponents = [
+        {
+            type: ComponentType.Button,
+            style: ButtonStyle.Primary,
+            label: 'Next',
+            custom_id: `setup_next_${setupId}`,
+        },
+        {
+            type: ComponentType.Button,
+            style: ButtonStyle.Secondary,
+            label: 'Back',
+            custom_id: `setup_back_${setupId}`,
+        },
+        {
+            type: ComponentType.Button,
+            style: ButtonStyle.Danger,
+            label: 'Cancel',
+            custom_id: `setup_cancel_${setupId}`,
+        },
+    ] as any;
+
+    if (isEditing) {
+        actionRowComponents.splice(2, 0, {
+            type: ComponentType.Button,
+            style: ButtonStyle.Secondary,
+            label: 'Dump JSON',
+            custom_id: `list_dump_${setupId}`,
+        });
+    }
 
     return {
         components: [
             {
                 type: ComponentType.TextDisplay,
-                content: '# Setup Vote Tracking - Step 3/6',
+                content: `# ${isEditing ? 'Edit' : 'Setup'} Vote Tracking - Step 3/6`,
             },
             {
                 type: ComponentType.TextDisplay,
@@ -184,26 +229,7 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
             },
             {
                 type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'Next',
-                        custom_id: `setup_next_${setupId}`,
-                    },
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Secondary,
-                        label: 'Back',
-                        custom_id: `setup_back_${setupId}`,
-                    },
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Danger,
-                        label: 'Cancel',
-                        custom_id: `setup_cancel_${setupId}`,
-                    },
-                ],
+                components: actionRowComponents,
             },
         ],
     };
@@ -211,7 +237,7 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
 
 export function buildExternalWebhookModal(setupId: string): APIModalInteractionResponseCallbackData {
     return {
-        title: 'External Webhook URL',
+        title: 'Notification Webhook',
         custom_id: `setup_modal_webhook_${setupId}`,
         components: [
             {
@@ -221,8 +247,8 @@ export function buildExternalWebhookModal(setupId: string): APIModalInteractionR
                         type: ComponentType.TextInput,
                         style: 1,
                         custom_id: 'webhook_url',
-                        label: 'Webhook URL',
-                        placeholder: 'https://your-webhook-url.com',
+                        label: 'Your Webhook URL',
+                        placeholder: 'https://your-server.com/vote-notification',
                         required: false,
                         max_length: 500,
                     },
@@ -236,22 +262,69 @@ export function buildMessagesStep(setupId: string, state: TSetupState): RESTPost
     const firstVoteMessage = state.messages.find(m => m.type === 'first-vote');
     const voteMessage = state.messages.find(m => m.type === 'vote');
 
-    const firstVoteStatus = firstVoteMessage ? '✅ Configured' : 'Configure';
-    const voteStatus = voteMessage ? '✅ Configured' : 'Configure';
+    const firstVoteStatus = firstVoteMessage ? '✅ Configured' : 'Default';
+    const voteStatus = voteMessage ? '✅ Configured' : 'Default';
+    const isEditing = !!state.editing_id;
+
+    const actionRowComponents = [
+        {
+            type: ComponentType.Button,
+            style: ButtonStyle.Primary,
+            label: 'Next',
+            custom_id: `setup_next_${setupId}`,
+        },
+        {
+            type: ComponentType.Button,
+            style: ButtonStyle.Secondary,
+            label: 'Back',
+            custom_id: `setup_back_${setupId}`,
+        },
+        {
+            type: ComponentType.Button,
+            style: ButtonStyle.Danger,
+            label: 'Cancel',
+            custom_id: `setup_cancel_${setupId}`,
+        },
+    ] as any;
+
+    if (isEditing) {
+        actionRowComponents.splice(2, 0, {
+            type: ComponentType.Button,
+            style: ButtonStyle.Secondary,
+            label: 'Dump JSON',
+            custom_id: `list_dump_${setupId}`,
+        });
+    }
 
     return {
         components: [
             {
                 type: ComponentType.TextDisplay,
-                content: '# Setup Vote Tracking - Step 4/6',
+                content: `# ${isEditing ? 'Edit' : 'Setup'} Vote Tracking - Step 4/6`,
             },
             {
                 type: ComponentType.TextDisplay,
-                content: 'Configure the messages sent when users vote.',
+                content: 'Configure the messages sent when users vote. This supports full JSON payloads even with flags.',
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '> 💡 Messages use Discord markdown. Available variables: {user}, {votes}',
+                content: '>>> 💡 Messages use Discord markdown.\n' +
+                    'Available variables:\n' +
+                    '- {user.mention}\n' +
+                    '- {user.displayName}\n' +
+                    '- {user.id}\n' +
+                    '- {votes.count.all}\n' +
+                    '- {votes.count.thisMonth}\n' +
+                    '- {votes.count.thisYear}\n' +
+                    '- {votes.count.thisWeek}\n' +
+                    '- {votes.lastVote}\n' +
+                    '- {entity.name}\n' +
+                    '- {entity.id}\n' +
+                    '- {platform}\n'
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: '> 💡 The bot fully supports components and/or embeds in these messages. Just provide the raw JSON payload as you would send to Discord\'s API.',
             },
             {
                 type: ComponentType.Separator,
@@ -307,26 +380,7 @@ export function buildMessagesStep(setupId: string, state: TSetupState): RESTPost
             },
             {
                 type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'Next',
-                        custom_id: `setup_next_${setupId}`,
-                    },
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Secondary,
-                        label: 'Back',
-                        custom_id: `setup_back_${setupId}`,
-                    },
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Danger,
-                        label: 'Cancel',
-                        custom_id: `setup_cancel_${setupId}`,
-                    },
-                ],
+                components: actionRowComponents,
             },
         ],
     };
@@ -344,8 +398,8 @@ export function buildFirstVoteMessageModal(setupId: string, currentValue: string
                         type: ComponentType.TextInput,
                         style: 2,
                         custom_id: 'message',
-                        label: 'Message Content',
-                        placeholder: 'Thanks {user} for your first vote! 🎉',
+                        label: 'Message shown on first vote',
+                        placeholder: '{user.mention} has voted for the first time! 🎉',
                         value: currentValue || undefined,
                         required: false,
                         max_length: 2000,
@@ -368,8 +422,8 @@ export function buildVoteMessageModal(setupId: string, currentValue: string): AP
                         type: ComponentType.TextInput,
                         style: 2,
                         custom_id: 'message',
-                        label: 'Message Content',
-                        placeholder: '{user} has voted! Total votes: {votes}',
+                        label: 'Message shown on every vote',
+                        placeholder: '{user.mention} has voted! Total votes: {votes.count.all}',
                         value: currentValue || undefined,
                         required: false,
                         max_length: 2000,
@@ -382,11 +436,12 @@ export function buildVoteMessageModal(setupId: string, currentValue: string): AP
 
 export function buildRewardsStep(setupId: string, state: TSetupState): RESTPostAPIChannelMessageJSONBody {
     const rewardsCount = state.rewards.length;
+    const isEditing = !!state.editing_id;
 
     const components: APIMessageTopLevelComponent[] = [
         {
             type: ComponentType.TextDisplay,
-            content: '# Setup Vote Tracking - Step 5/6',
+            content: `# ${isEditing ? 'Edit' : 'Setup'} Vote Tracking - Step 5/6`,
         },
         {
             type: ComponentType.TextDisplay,
@@ -410,31 +465,34 @@ export function buildRewardsStep(setupId: string, state: TSetupState): RESTPostA
                     custom_id: `setup_add_reward_${setupId}`,
                     disabled: rewardsCount >= 25,
                 },
-                {
-                    type: ComponentType.Button,
-                    style: ButtonStyle.Danger,
-                    label: 'Remove Last Role',
-                    custom_id: `setup_remove_reward_${setupId}`,
-                    disabled: rewardsCount === 0,
-                },
             ],
         },
     ];
 
     if (rewardsCount > 0) {
         components.push({
-            type: ComponentType.Container,
-            components: [
-                {
-                    type: ComponentType.TextDisplay,
-                    content: `## Current Rewards (${rewardsCount})`,
-                },
-                {
-                    type: ComponentType.TextDisplay,
-                    content: state.rewards.map((r, i) => `${i + 1}. <@&${r.role_id}>${r.min_votes > 0 ? ` (min ${r.min_votes} votes)` : ''}`).join('\n'),
-                },
-            ],
+            type: ComponentType.TextDisplay,
+            content: `## Current Rewards (${rewardsCount})`,
         });
+
+        for (let i = 0; i < state.rewards.length; i++) {
+            const r = state.rewards[i];
+            components.push({
+                type: ComponentType.Section,
+                components: [
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: `${i + 1}. <@&${r.role_id}>${r.min_votes > 0 ? ` (min ${r.min_votes} votes)` : ''}${r.duration_min > 0 ? ` (${r.duration_min} min)` : ''}`,
+                    },
+                ],
+                accessory: {
+                    type: ComponentType.Button,
+                    style: ButtonStyle.Danger,
+                    label: 'Remove',
+                    custom_id: `setup_remove_reward_${setupId}_${i}`,
+                },
+            });
+        }
     }
 
     components.push({
@@ -442,28 +500,39 @@ export function buildRewardsStep(setupId: string, state: TSetupState): RESTPostA
         spacing: 1,
     });
 
+    const actionRowComponents = [
+        {
+            type: ComponentType.Button,
+            style: ButtonStyle.Primary,
+            label: 'Next',
+            custom_id: `setup_next_${setupId}`,
+        },
+        {
+            type: ComponentType.Button,
+            style: ButtonStyle.Secondary,
+            label: 'Back',
+            custom_id: `setup_back_${setupId}`,
+        },
+        {
+            type: ComponentType.Button,
+            style: ButtonStyle.Danger,
+            label: 'Cancel',
+            custom_id: `setup_cancel_${setupId}`,
+        },
+    ] as any;
+
+    if (isEditing) {
+        actionRowComponents.splice(2, 0, {
+            type: ComponentType.Button,
+            style: ButtonStyle.Secondary,
+            label: 'Dump JSON',
+            custom_id: `list_dump_${setupId}`,
+        });
+    }
+
     components.push({
         type: ComponentType.ActionRow,
-        components: [
-            {
-                type: ComponentType.Button,
-                style: ButtonStyle.Primary,
-                label: 'Next',
-                custom_id: `setup_next_${setupId}`,
-            },
-            {
-                type: ComponentType.Button,
-                style: ButtonStyle.Secondary,
-                label: 'Back',
-                custom_id: `setup_back_${setupId}`,
-            },
-            {
-                type: ComponentType.Button,
-                style: ButtonStyle.Danger,
-                label: 'Cancel',
-                custom_id: `setup_cancel_${setupId}`,
-            },
-        ],
+        components: actionRowComponents,
     });
 
     return {components};
@@ -475,44 +544,41 @@ export function buildAddRewardModal(setupId: string): APIModalInteractionRespons
         custom_id: `setup_modal_addreward_${setupId}`,
         components: [
             {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.RoleSelect,
-                        custom_id: 'role_id',
-                        placeholder: 'Select a role to reward',
-                        min_values: 1,
-                        max_values: 1,
-                    } as any,
-                ],
+                type: ComponentType.Label,
+                label: 'Role to reward',
+                component: {
+                    type: ComponentType.RoleSelect,
+                    custom_id: 'role_id',
+                    placeholder: 'Select a role to reward',
+                    min_values: 1,
+                    max_values: 1,
+                },
             },
             {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.TextInput,
-                        style: 1,
-                        custom_id: 'min_votes',
-                        label: 'Minimum Votes Required',
-                        placeholder: 'Leave empty for no minimum',
-                        required: false,
-                        max_length: 10,
-                    },
-                ],
+                type: ComponentType.Label,
+                label: 'Minimum votes required (optional)',
+                description: 'Leave empty for no minimum',
+                component: {
+                    type: ComponentType.TextInput,
+                    style: 1,
+                    custom_id: 'min_votes',
+                    placeholder: '5',
+                    required: false,
+                    max_length: 10,
+                },
             },
             {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.TextInput,
-                        style: 1,
-                        custom_id: 'duration_min',
-                        label: 'Duration in Minutes (optional)',
-                        placeholder: 'Leave empty for permanent',
-                        required: false,
-                        max_length: 10,
-                    },
-                ],
+                type: ComponentType.Label,
+                label: 'Duration in minutes (optional)',
+                description: 'Leave empty for permanent role',
+                component: {
+                    type: ComponentType.TextInput,
+                    style: 1,
+                    custom_id: 'duration_min',
+                    placeholder: '60',
+                    required: false,
+                    max_length: 10,
+                },
             },
         ],
     };
@@ -525,7 +591,7 @@ export function buildCompleteStep(setupId: string, state: TSetupState, webhookUr
         state.channel_id ? `**Logging Channel:** <#${state.channel_id}>` : '**Logging Channel:** Not set',
         state.external_webhook_url ? `**External Webhook:** Set` : '**External Webhook:** Not set',
         state.rewards.length > 0 ? `**Reward Roles:** ${state.rewards.length}` : '**Reward Roles:** None',
-        state.messages.length > 0 ? `**Messages:** ${state.messages.length} configured` : '**Messages:** Not configured',
+        state.messages.length > 0 ? `**Messages:** ${state.messages.length} configured` : '**Messages:** Defaults',
     ].join('\n');
 
     return {

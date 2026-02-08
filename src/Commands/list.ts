@@ -1,13 +1,12 @@
 import {Context} from "@Utils/Context";
 import {Command} from "@Types/Discord";
 import {ApplicationIntegrationType, InteractionContextType, MessageFlags,} from "discord-api-types/v10";
-import {createSetupState} from "@Utils/SetupManager";
-import {buildEntitySelectionStep} from "@Utils/SetupComponents";
+import {buildSetupList, getAllSetupsForServer} from "@Utils/SetupManager";
 
-export default class SetupCommand implements Command {
+export default class ListCommand implements Command {
     data = {
-        name: 'setup',
-        description: 'Setup vote tracking for your server or bot',
+        name: 'list',
+        description: 'List all vote tracking setups for this server',
         integration_types: [ApplicationIntegrationType.GuildInstall],
         contexts: [InteractionContextType.Guild],
     };
@@ -19,10 +18,11 @@ export default class SetupCommand implements Command {
             });
         }
 
-        const setupId = await createSetupState(ctx.interaction.guild_id!, ctx.user.id);
+        const setups = await getAllSetupsForServer(ctx.interaction.guild_id!);
+        const payload = buildSetupList(setups, ctx.interaction.guild_id!);
 
         return ctx.reply({
-            ...buildEntitySelectionStep(setupId),
+            ...payload,
             flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
         });
     }

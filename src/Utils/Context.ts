@@ -1,17 +1,17 @@
 import {
-    APIInteraction,
-    InteractionType,
     APIApplicationCommandAutocompleteInteraction,
     APIApplicationCommandInteraction,
-    APIMessageComponentInteraction,
-    Routes,
-    Locale,
-    APIUser,
-    APIModalInteractionResponseCallbackData,
-    InteractionResponseType,
     APIApplicationCommandOptionChoice,
     APIChatInputApplicationCommandInteractionData,
     APIGuildMember,
+    APIInteraction,
+    APIMessageComponentInteraction,
+    APIModalInteractionResponseCallbackData,
+    APIUser,
+    InteractionResponseType,
+    InteractionType,
+    Locale,
+    Routes,
 } from "discord-api-types/v10";
 import type {TServerResponse} from "@Types/HttpClient";
 import {IContextPayload, IContextPayloadExtended} from "@Types/Context";
@@ -22,11 +22,16 @@ import Logger from "@Utils/Logger";
 export class Context {
     private readonly _res: TServerResponse;
     private readonly _interaction: APIInteraction;
-    private _deferred: boolean = false;
 
     constructor(interaction: APIInteraction, res: TServerResponse) {
         this._res = res;
         this._interaction = interaction;
+    }
+
+    private _deferred: boolean = false;
+
+    get deferred() {
+        return this._deferred;
     }
 
     get interaction() {
@@ -45,8 +50,8 @@ export class Context {
         return this.isCommand() || this.isAutoComplete() || this.isModal() || this.isComponent() ? this.interaction.locale : Locale.EnglishGB;
     }
 
-    get deferred() {
-        return this._deferred;
+    get isInGuild() {
+        return this.interaction.guild_id !== null;
     }
 
     isModal(): this is { interaction: APIMessageComponentInteraction } {
@@ -63,10 +68,6 @@ export class Context {
 
     isCommand(): this is { interaction: APIApplicationCommandInteraction } {
         return this._interaction.type === InteractionType.ApplicationCommand;
-    }
-
-    get isInGuild() {
-        return this.interaction.guild_id !== null;
     }
 
     _buildResponse(payload: IContextPayload) {
