@@ -14,4 +14,6 @@ export type TWorker = {
 
 export enum EWorkerJobs {
     Unknown = 'UNKNOWN',
+    SendTestLoggingMessage = 'SEND_TEST_LOGGING_MESSAGE',
+    SendExternalWebhookNotification = 'SEND_EXTERNAL_WEBHOOK_NOTIFICATION',
 }

@@ -1,6 +1,6 @@
-import {APIBaseMessageNoChannel} from "discord-api-types/v10";
+import {RESTPostAPIChannelMessageJSONBody} from "discord-api-types/v10";
 
-export interface IContextPayload extends Partial<APIBaseMessageNoChannel> {
+export interface IContextPayload extends Partial<RESTPostAPIChannelMessageJSONBody> {
 }
 
 export type IContextPayloadFile = { name: string, data: Buffer };

@@ -29,6 +29,9 @@ src/
 ### 1. NO Code Comments
 Never add comments to the code. Code should be self-documenting through descriptive names.
 
+### 1.1 NO ANY
+Never use the type any, typing is there for a reason.
+
 ### 2. Descriptive Names Only
 - **Variables**: Use full descriptive names
   - ❌ `usr`, `usrId`, `tmp`

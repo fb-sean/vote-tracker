@@ -25,16 +25,10 @@ export default class CorsMiddleware implements Middleware {
         res.setHeader('Vary', 'Origin');
 
         if ((origin && allowedOrigins.includes(origin)) || (referer && allowedOrigins.includes(referer))) {
-            if ((origin && devOrigins.includes(origin)) || (referer && devOrigins.includes(referer))) {
-                req.isDev = true;
-            }
-
             res.setHeader('Access-Control-Allow-Origin', String(origin ?? referer));
         } else {
             res.setHeader('Access-Control-Allow-Origin', '*');
         }
-
-        req.frontEndUrl = req.isDev ? 'http://localhost:4402' : 'https://hangman.discord.dad';
 
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');

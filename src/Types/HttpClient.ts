@@ -1,5 +1,4 @@
 import * as http from "node:http";
-import type {UserData} from "@Schemas/UserData";
 import type {TDiscordUserAuthData, TUserSettings} from "@Types/Discord";
 
 export type TIncomingMessage = http.IncomingMessage & {
@@ -11,9 +10,6 @@ export type TIncomingMessage = http.IncomingMessage & {
         [key: string]: any;
     };
     _rawBody?: string;
-    isDev?: boolean;
-    frontEndUrl?: string;
-    user?: (UserData & TDiscordUserAuthData & TUserSettings) | null;
 };
 
 export type TServerResponse = http.ServerResponse & {

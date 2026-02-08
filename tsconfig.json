@@ -30,6 +30,9 @@
       ],
       "@Types/*": [
         "src/Types/*"
+      ],
+      "@Handlers/*": [
+        "src/Handlers/*"
       ]
     }
   },
