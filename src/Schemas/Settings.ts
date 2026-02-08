@@ -9,6 +9,10 @@ const RewardSchema = new Schema(
             type: Number,
             default: 0
         },
+        min_votes: {
+            type: Number,
+            default: 0
+        },
     },
     {
         versionKey: false
@@ -44,6 +48,10 @@ const SettingsSchema = new Schema(
             default: null
         },
         auth_token: {
+            type: String,
+            default: null
+        },
+        external_webhook_url: {
             type: String,
             default: null
         },
