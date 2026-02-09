@@ -63,6 +63,10 @@ const SettingsSchema = new Schema(
             type: [MessageSchema],
             default: []
         },
+        disabled: {
+            type: Boolean,
+            default: false
+        },
     },
     {
         versionKey: false
