@@ -279,22 +279,24 @@ export default class InteractionRoute implements TRoute {
 
     async handleListComponent(ctx: Context, parts: string[]) {
         const action = parts[1];
-        const setupId = parts[2];
 
         try {
             switch (action) {
                 case 'edit':
-                    return handleListEdit(ctx, setupId);
+                    return handleListEdit(ctx, parts[2]);
                 case 'dump':
-                    return handleListDump(ctx, setupId);
+                    return handleListDump(ctx, parts[2]);
                 case 'delete':
+                    // list_delete_{setupId} -> parts: ['list', 'delete', setupId]
+                    // list_delete_confirm_{setupId} -> parts: ['list', 'delete', 'confirm', setupId]
+                    // list_delete_cancel_{setupId} -> parts: ['list', 'delete', 'cancel', setupId]
                     if (parts[2] === 'confirm') {
-                        return handleListDeleteConfirm(ctx, setupId);
+                        return handleListDeleteConfirm(ctx, parts[3]);
                     }
                     if (parts[2] === 'cancel') {
-                        return handleListDeleteCancel(ctx, setupId);
+                        return handleListDeleteCancel(ctx, parts[3]);
                     }
-                    return handleListDelete(ctx, setupId);
+                    return handleListDelete(ctx, parts[2]);
                 default:
                     return ctx.reply({content: 'Unknown list action.'});
             }
