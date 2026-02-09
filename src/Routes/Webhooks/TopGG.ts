@@ -6,11 +6,13 @@ import Logger from "@Utils/Logger";
 import RedisQueue from "@API/RedisQueue";
 import {EWorkerJobs} from "@Types/RedisQueue";
 
-export default class RegisterRoute implements TRoute {
+export default class WebhookTopGGRoute implements TRoute {
     method = 'POST';
-    path = '/integrations/top-gg/register';
+    path = '/webhooks/top-gg/:token';
 
     async execute(req: TIncomingMessage, res: TServerResponse) {
+        console.log(req.body);
+
         if (!req.body || !['integration.create', 'integration.delete'].includes(req.body.type)) {
             return Response(res, {
                 status: 400,
