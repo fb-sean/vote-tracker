@@ -1,8 +1,10 @@
 import type {TIncomingMessage, TRoute, TServerResponse} from "@Types/HttpClient";
-import {Response} from "@Utils/Http";
-import TopggConnectionModel from "@Schemas/Integrations/Topgg";
-import {generateKey} from "@Utils/Key";
+import crypto from "crypto";
+import {getParams, Response} from "@Utils/Http";
 import Logger from "@Utils/Logger";
+import TopggConnectionModel from "@Schemas/Integrations/Topgg";
+import UserDataModel from "@Schemas/UserData";
+import SettingsModel from "@Schemas/Settings";
 import RedisQueue from "@API/RedisQueue";
 import {EWorkerJobs} from "@Types/RedisQueue";
 
@@ -11,79 +13,103 @@ export default class WebhookTopGGRoute implements TRoute {
     path = '/webhooks/top-gg/:token';
 
     async execute(req: TIncomingMessage, res: TServerResponse) {
-        console.log(req.body);
+        const params = getParams(req, this);
+        if (!params.token) {
+            return Response(res, {error: 'Missing token'}, 400);
+        }
 
-        if (!req.body || !['integration.create', 'integration.delete'].includes(req.body.type)) {
-            return Response(res, {
-                status: 400,
-                message: 'Missing or invalid body'
-            }, 400);
+        const connection = await TopggConnectionModel.findOne({internal_webhook_token: params.token});
+        if (!connection) {
+            return Response(res, {error: 'Invalid token'}, 400);
+        }
+
+        if (!req.body) {
+            return Response(res, {error: 'Invalid body'}, 400);
+        }
+
+        const signatureHeader = req.headers['x-topgg-signature'] as string;
+        if (!signatureHeader) {
+            Logger.warn('TopGG webhook missing signature', 'TOPGG');
+
+            return Response(res, {error: 'Missing signature'}, 401);
+        }
+
+        const parsedSignature = signatureHeader.split(',').map(part => part.split('='));
+        const sigObj = Object.fromEntries(parsedSignature);
+
+        const timestamp = sigObj['t'];
+        const signature = sigObj['v1'];
+
+        if (!timestamp || !signature) {
+            Logger.warn('TopGG webhook invalid signature format', 'TOPGG');
+
+            return Response(res, {error: 'Invalid signature format'}, 400);
+        }
+
+        const body = req._rawBody || JSON.stringify(req.body);
+
+        if (!connection.webhook_secret) {
+            Logger.error('TopGG connection missing webhook_secret', 'TOPGG');
+
+            return Response(res, {error: 'Configuration error'}, 500);
+        }
+
+        const hmac = crypto.createHmac('sha256', connection.webhook_secret);
+        const digest = hmac.update(`${timestamp}.${body}`).digest('hex');
+
+        if (signature !== digest) {
+            Logger.warn('TopGG webhook invalid signature', 'TOPGG');
+
+            return Response(res, {error: 'Invalid signature'}, 401);
         }
 
         const type = req.body.type;
         const data = req.body.data;
 
-        if (!data) {
-            return Response(res, {
-                status: 400,
-                message: 'Missing data'
-            }, 400);
-        }
-
-        if (!type) {
-            return Response(res, {
-                status: 400,
-                message: 'Missing type'
-            }, 400);
-        }
-
-        if (type === 'integration.create') {
-            const internalWebhookToken = generateKey();
-
-            await TopggConnectionModel.create({
-                connection_id: data.connection_id,
-                webhook_secret: data.webhook_secret,
-                project_id: data.project.id,
-                project_platform: data.project.platform,
-                project_platform_id: data.project.platform_id,
-                project_type: data.project.type,
-                user_id: data.user.platform_id,
-                internal_webhook_token: internalWebhookToken
-            });
-
-            Logger.info(`Registered Top.gg integration for ${data.project.platform_id} by ${data.user.platform_id}`, 'INTEGRATIONS');
-
-            return Response(res, {
-                webhook_url: `https://votes.discordbots.xyz/webhooks/top-gg/${internalWebhookToken}`,
-                routes: [
-                    'vote.create'
-                ]
-            });
-        } else if (type === 'integration.delete') {
-            const oldConnection = await TopggConnectionModel.findOne({connection_id: data.connection_id});
-            if (!oldConnection) {
-                return Response(res, {
-                    status: 404,
-                    message: 'Not found'
-                }, 404);
+        await UserDataModel.findOneAndUpdate(
+            {
+                userId: data.user.platform_id
+            },
+            {
+                userId: data.user.platform_id,
+                username: data.user.name,
+                avatar: data.user.avatar_url.split('/').pop().split('.')[0]
+            },
+            {
+                upsert: true
             }
+        );
 
-            await TopggConnectionModel.deleteOne({connection_id: data.connection_id});
+        const mappedData = {
+            type: type === 'webhook.test' ? 'test' : 'vote',
+            user_id: data.user.platform_id,
+            entity_id: data.project.platform_id,
+            entity_type: data.project.type,
+        };
 
-            await RedisQueue.getInstance().addJob(EWorkerJobs.DisconnectedTopggWebhook, {
-                entity_id: oldConnection.project_platform_id,
-                entity_type: oldConnection.project_type,
-            });
+        Logger.info(`Received ${mappedData.type} from ${mappedData.user_id} for ${mappedData.entity_type} ${mappedData.entity_id}`, 'TOPGG');
 
-            return Response(res, {
-                status: 200,
-                message: 'Successfully unregistered'
-            });
+        const settings = await SettingsModel.findOne({
+            entity_type: mappedData.entity_type,
+            entity_id: mappedData.entity_id,
+        });
+
+        if (!settings) {
+            Logger.warn(`No settings found for ${mappedData.entity_type} ${mappedData.entity_id}`, 'TOPGG');
+            return Response(res, {message: 'Vote received (no settings configured)'});
         }
 
-        return Response(res, {
-            status: 400,
-            message: 'Invalid request'
-        }, 400);
+        await RedisQueue.getInstance().addJob(EWorkerJobs.ComputeVote, {
+            user_id: mappedData.user_id,
+            server_id: settings.server_id,
+            entity_type: mappedData.entity_type,
+            entity_id: mappedData.entity_id,
+            platform: 'topgg',
+            is_test: mappedData.type === 'test',
+            guild_id: settings.server_id,
+        });
+
+        Logger.info(`Vote queued for processing`, 'TOPGG');
+        return Response(res, {message: 'Vote received'});
     }
 }

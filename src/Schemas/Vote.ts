@@ -2,27 +2,47 @@ import mongoose, {InferSchemaType, Schema, Types} from "mongoose";
 
 const VoteSchema = new Schema(
     {
-        entity_id: {
-            type: String,
-        },
-        entity_type: {
-            type: String, // 'bot' or 'server'
-        },
         user_id: {
             type: String,
+            required: true,
         },
-        date: {
-            type: Date,
-            default: Date.now
-        }
+        server_id: {
+            type: String,
+            required: true,
+        },
+        entity_type: {
+            type: String,
+            enum: ['bot', 'server'],
+            required: true,
+        },
+        entity_id: {
+            type: String,
+            required: true,
+        },
+        platform: {
+            type: String,
+            required: true,
+        },
+        is_test: {
+            type: Boolean,
+            default: false,
+        },
+        guild_id: {
+            type: String,
+            default: null,
+        },
     },
     {
-        versionKey: false
+        versionKey: false,
+        timestamps: true,
     }
 );
 
-VoteSchema.index({entity_id: 1, entity_type: 1, user_id: 1});
-VoteSchema.index({user_id: 1});
+VoteSchema.index({user_id: 1, server_id: 1});
+VoteSchema.index({entity_id: 1, platform: 1});
+VoteSchema.index({entity_id: 1, server_id: 1});
+VoteSchema.index({server_id: 1, createdAt: -1});
+VoteSchema.index({user_id: 1, createdAt: -1});
 
 export type Vote = InferSchemaType<typeof VoteSchema> & { _id: Types.ObjectId };
 

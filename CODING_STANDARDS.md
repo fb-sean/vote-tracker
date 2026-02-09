@@ -32,6 +32,14 @@ Never add comments to the code. Code should be self-documenting through descript
 ### 1.1 NO ANY
 Never use the type any, typing is there for a reason.
 
+### 1.2 Typing ALWAYS in the /@Typing directory
+Always use the `/@Typing` directory for TypeScript definitions to keep them organized and easily accessible.
+
+### 1.3 Typing styel
+- Interfaces always start with `I`
+- Enums always start with `E`
+- Types always start with `T`
+
 ### 2. Descriptive Names Only
 - **Variables**: Use full descriptive names
   - ❌ `usr`, `usrId`, `tmp`

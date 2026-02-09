@@ -1,5 +1,5 @@
 export interface IWorkerPayloadData {
-    [key: string]: string | number | boolean | null | object;
+    [key: string]: string | number | boolean | null | object | undefined;
 }
 
 export type TWorkerEvent = (data: IWorkerPayloadData) => Promise<void>;
@@ -14,5 +14,9 @@ export type TWorker = {
 
 export enum EWorkerJobs {
     Unknown = 'UNKNOWN',
-    DisconnectedTopggWebhook = 'DISCONNECTED_TOPGG_WEBHOOK'
+    DisconnectedTopggWebhook = 'DISCONNECTED_TOPGG_WEBHOOK',
+    ComputeVote = 'COMPUTE_VOTE',
+    SendMessage = 'SEND_MESSAGE',
+    GiveRoles = 'GIVE_ROLES',
+    SendExternalWebhook = 'SEND_EXTERNAL_WEBHOOK',
 }
