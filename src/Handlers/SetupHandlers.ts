@@ -400,15 +400,23 @@ export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, m
     }
 
     let payload = message.trim();
+    const IsComponentsV2 = 1 << 24; // 16777216
 
     // Check if it's JSON and ensure ComponentsV2 flag is present
     if (payload.startsWith('{') || payload.startsWith('[')) {
         try {
             const parsed = JSON.parse(payload);
-            // If it's a components v2 payload (has 'components' property), ensure IsComponentsV2 flag
-            if (parsed.components && Array.isArray(parsed.components)) {
+
+            // If it's an array, wrap it as a Components v2 payload
+            if (Array.isArray(parsed)) {
+                payload = JSON.stringify({
+                    components: parsed,
+                    flags: IsComponentsV2,
+                });
+            }
+            // If it's an object with 'components' property, ensure IsComponentsV2 flag
+            else if (parsed.components && Array.isArray(parsed.components)) {
                 const flags = parsed.flags || 0;
-                const IsComponentsV2 = 1 << 24; // 16777216
                 if (!(flags & IsComponentsV2)) {
                     parsed.flags = flags | IsComponentsV2;
                     payload = JSON.stringify(parsed);
@@ -442,15 +450,23 @@ export async function handleSetupVoteModal(ctx: Context, setupId: string, messag
     }
 
     let payload = message.trim();
+    const IsComponentsV2 = 1 << 24; // 16777216
 
     // Check if it's JSON and ensure ComponentsV2 flag is present
     if (payload.startsWith('{') || payload.startsWith('[')) {
         try {
             const parsed = JSON.parse(payload);
-            // If it's a components v2 payload (has 'components' property), ensure IsComponentsV2 flag
-            if (parsed.components && Array.isArray(parsed.components)) {
+
+            // If it's an array, wrap it as a Components v2 payload
+            if (Array.isArray(parsed)) {
+                payload = JSON.stringify({
+                    components: parsed,
+                    flags: IsComponentsV2,
+                });
+            }
+            // If it's an object with 'components' property, ensure IsComponentsV2 flag
+            else if (parsed.components && Array.isArray(parsed.components)) {
                 const flags = parsed.flags || 0;
-                const IsComponentsV2 = 1 << 24; // 16777216
                 if (!(flags & IsComponentsV2)) {
                     parsed.flags = flags | IsComponentsV2;
                     payload = JSON.stringify(parsed);

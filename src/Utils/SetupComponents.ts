@@ -121,18 +121,17 @@ export function buildEntityIdModal(setupId: string): APIModalInteractionResponse
         custom_id: `setup_modal_entityid_${setupId}`,
         components: [
             {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.TextInput,
-                        style: 1,
-                        custom_id: 'entity_id',
-                        label: 'Your Bot or Server ID',
-                        placeholder: 'Paste your ID here...',
-                        required: true,
-                        max_length: 100,
-                    },
-                ],
+                type: ComponentType.Label,
+                label: 'Your Bot or Server ID',
+                description: 'Enter your actual Discord application ID (bot) or Discord server ID',
+                component: {
+                    type: ComponentType.TextInput,
+                    style: 1,
+                    custom_id: 'entity_id',
+                    placeholder: 'Paste your ID here...',
+                    required: true,
+                    max_length: 100,
+                },
             },
         ],
     };
@@ -404,19 +403,30 @@ export function buildFirstVoteMessageModal(setupId: string, currentValue: string
         custom_id: `setup_modal_firstvote_${setupId}`,
         components: [
             {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.TextInput,
-                        style: 2,
-                        custom_id: 'message',
-                        label: 'Message shown on first vote',
-                        placeholder: '{user.mention} has voted for the first time! 🎉',
-                        value: currentValue || undefined,
-                        required: false,
-                        max_length: 2000,
-                    },
-                ],
+                type: ComponentType.TextDisplay,
+                content: '**Message Configuration**\n\nYou can use plain text with variables, or provide a JSON payload from [discord.builders](<https://discord.builders>).',
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: '**Available Variables:**\n• {user.mention} - User mention\n• {user.displayName} - Display name\n• {user.id} - User ID\n• {user.avatarUrl} - Avatar URL\n• {votes.count.all} - Total votes\n• {votes.count.thisMonth} - This month\n• {votes.count.thisYear} - This year\n• {votes.count.thisWeek} - This week\n• {votes.streak.current} - Current streak\n• {votes.streak.best} - Best streak\n• {votes.lastVote} - Last vote timestamp\n• {entity.type} - Entity type\n• {entity.id} - Entity ID\n• {platform} - Platform name',
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: '> 💡 Supports Components v2 JSON payloads. Paste an array from discord.builders and it will be auto-wrapped with the correct flags!',
+            },
+            {
+                type: ComponentType.Label,
+                label: 'Your Message',
+                description: 'Plain text or JSON payload',
+                component: {
+                    type: ComponentType.TextInput,
+                    style: 2,
+                    custom_id: 'message',
+                    placeholder: '{user.mention} has voted for the first time! 🎉',
+                    value: currentValue || undefined,
+                    required: false,
+                    max_length: 4000,
+                },
             },
         ],
     };
@@ -428,19 +438,30 @@ export function buildVoteMessageModal(setupId: string, currentValue: string): AP
         custom_id: `setup_modal_vote_${setupId}`,
         components: [
             {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.TextInput,
-                        style: 2,
-                        custom_id: 'message',
-                        label: 'Message shown on every vote',
-                        placeholder: '{user.mention} has voted! Total votes: {votes.count.all}',
-                        value: currentValue || undefined,
-                        required: false,
-                        max_length: 2000,
-                    },
-                ],
+                type: ComponentType.TextDisplay,
+                content: '**Message Configuration**\n\nYou can use plain text with variables, or provide a JSON payload from [discord.builders](<https://discord.builders>).',
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: '**Available Variables:**\n• {user.mention} - User mention\n• {user.displayName} - Display name\n• {user.id} - User ID\n• {user.avatarUrl} - Avatar URL\n• {votes.count.all} - Total votes\n• {votes.count.thisMonth} - This month\n• {votes.count.thisYear} - This year\n• {votes.count.thisWeek} - This week\n• {votes.streak.current} - Current streak\n• {votes.streak.best} - Best streak\n• {votes.lastVote} - Last vote timestamp\n• {entity.type} - Entity type\n• {entity.id} - Entity ID\n• {platform} - Platform name',
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: '> 💡 Supports Components v2 JSON payloads. Paste an array from discord.builders and it will be auto-wrapped with the correct flags!',
+            },
+            {
+                type: ComponentType.Label,
+                label: 'Your Message',
+                description: 'Plain text or JSON payload',
+                component: {
+                    type: ComponentType.TextInput,
+                    style: 2,
+                    custom_id: 'message',
+                    placeholder: '{user.mention} has voted! Total votes: {votes.count.all}',
+                    value: currentValue || undefined,
+                    required: false,
+                    max_length: 4000,
+                },
             },
         ],
     };
