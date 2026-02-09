@@ -6,13 +6,12 @@ import Redis from "@API/RedisCache";
 import Logger from "@Utils/Logger";
 import type {ISendMessagePayload, IMessagePlaceholders} from "@Types/Workers";
 
-const IsComponentsV2 = MessageFlags.IsComponentsV2;
-
 export default class SendMessageWorker implements TWorker {
     jobName = EWorkerJobs.SendMessage;
     maxPerSecond = 20;
     maxDuration = 5000;
     concurrency = 5;
+    private readonly PERMISSION_CACHE_TTL = 900;
 
     async execute(payload: IWorkerPayloadData): Promise<void> {
         const data = payload as unknown as ISendMessagePayload;
@@ -94,15 +93,28 @@ export default class SendMessageWorker implements TWorker {
             const parsed = JSON.parse(messageRaw);
 
             if (Array.isArray(parsed)) {
+                let content = '';
+                const components: unknown[] = [];
+
+                for (const item of parsed) {
+                    if (item.type === 10 && item.content) {
+                        content = item.content as string;
+                    } else if (item.type === 1 && item.components) {
+                        components.push(...item.components);
+                    } else if (item.type === 2) {
+                        components.push(item);
+                    }
+                }
+
                 return {
-                    content: this.replacePlaceholders('', placeholders),
-                    components: parsed,
-                    flags: IsComponentsV2,
+                    content: this.replacePlaceholders(content, placeholders),
+                    components: components.length > 0 ? components : undefined,
+                    flags: MessageFlags.IsComponentsV2,
                 };
             }
 
             if (parsed.content) {
-                parsed.content = this.replacePlaceholders(parsed.content, placeholders);
+                parsed.content = this.replacePlaceholders(parsed.content as string, placeholders);
             }
 
             return parsed;
@@ -127,7 +139,15 @@ export default class SendMessageWorker implements TWorker {
     private async sendWithRateLimit(channelId: string, message: Record<string, unknown>): Promise<void> {
         const bot = DiscordClient.getInstance();
 
-        const rateLimitKey = 'discord:rate_limit:global';
+        const permCacheKey = `discord:vt:channel_no_perms:${channelId}`;
+        const hasNoPerms = await Redis.getInstance().get<string>(permCacheKey);
+
+        if (hasNoPerms === 'true') {
+            Logger.warn(`Channel ${channelId} has no permissions (cached), skipping`, 'SEND_MESSAGE');
+            return;
+        }
+
+        const rateLimitKey = 'discord:vt:rate_limit:global';
         const maxTokens = 45;
         const refillRate = 45;
         const window = 1000;
@@ -136,6 +156,7 @@ export default class SendMessageWorker implements TWorker {
 
         if (!acquired) {
             await this.sleep(100);
+
             return this.sendWithRateLimit(channelId, message);
         }
 
@@ -147,15 +168,23 @@ export default class SendMessageWorker implements TWorker {
                 },
             });
         } catch (error: unknown) {
-            const err = error as { code?: number; retry_after?: number };
-            if (err.code === 429) {
-                const retryAfter = err.retry_after || 1;
+            const discordError = error as { code?: number; retry_after?: number };
+            if (discordError.code === 429) {
+                const retryAfter = discordError.retry_after || 1;
+
                 Logger.warn(`Rate limited, waiting ${retryAfter}s`, 'SEND_MESSAGE');
 
-                await Redis.getInstance().set('discord:rate_limited', 'true', Math.ceil(retryAfter));
+                await Redis.getInstance().set('discord:vt:rate_limited', 'true', Math.ceil(retryAfter));
 
                 await this.sleep(retryAfter * 1000);
+
                 return this.sendWithRateLimit(channelId, message);
+            }
+
+            if (discordError.code === 50001 || discordError.code === 50013 || discordError.code === 10003) {
+                Logger.warn(`No permissions for channel ${channelId}, caching failure`, 'SEND_MESSAGE');
+                await Redis.getInstance().set(permCacheKey, 'true', this.PERMISSION_CACHE_TTL);
+                return;
             }
 
             throw error;
@@ -175,7 +204,9 @@ export default class SendMessageWorker implements TWorker {
 
         if (tokens >= 1) {
             tokens -= 1;
+
             await redis.set(key, tokens.toString(), 1);
+
             return true;
         }
 

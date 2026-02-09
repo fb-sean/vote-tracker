@@ -288,11 +288,19 @@ export default class ComputeVoteWorker implements TWorker {
 
     private async checkUserInGuild(guildId: string, userId: string): Promise<boolean> {
         try {
-            const cacheKey = `user_in_guild:${guildId}:${userId}`;
+            const cacheKey = `discord:vt:user_in_guild:${guildId}:${userId}`;
             const cached = await Redis.getInstance().get<string>(cacheKey);
 
             if (cached !== null) {
                 return cached === 'true';
+            }
+
+            const permCacheKey = `discord:vt:guild_no_access:${guildId}`;
+            const hasNoAccess = await Redis.getInstance().get<string>(permCacheKey);
+
+            if (hasNoAccess === 'true') {
+                Logger.warn(`No access to guild ${guildId} (cached), assuming user exists`, 'COMPUTE_VOTE');
+                return true;
             }
 
             const bot = DiscordClient.getInstance();
@@ -300,10 +308,16 @@ export default class ComputeVoteWorker implements TWorker {
 
             const exists = !!member;
 
-            await Redis.getInstance().set(cacheKey, exists.toString(), 300);
+            await Redis.getInstance().set(cacheKey, exists.toString(), 900);
 
             return exists;
-        } catch {
+        } catch (error: unknown) {
+            const discordError = error as { code?: number };
+            if (discordError.code === 50001 || discordError.code === 50004 || discordError.code === 10004) {
+                const permCacheKey = `discord:vt:guild_no_access:${guildId}`;
+                await Redis.getInstance().set(permCacheKey, 'true', 900);
+                Logger.warn(`No access to guild ${guildId}, caching failure`, 'COMPUTE_VOTE');
+            }
             return true;
         }
     }

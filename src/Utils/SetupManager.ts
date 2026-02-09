@@ -135,6 +135,12 @@ export async function saveSetupToDatabase(setupId: string): Promise<boolean> {
         await deleteSetupState(setupId);
 
         return true;
+    } else {
+        // Default messages
+        state.messages = [
+            {type: 'first-vote', payload: '{user.mention} has voted for the first time! 🎉'},
+            {type: 'vote', payload: '{user.mention} has voted! Total votes: {votes.count.all}'},
+        ];
     }
 
     if (!state.auth_token) {

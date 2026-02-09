@@ -5,6 +5,8 @@ import {loadRoutes} from "@Utils/RouteLoader";
 import createHttpClient from "@API/HttpClient";
 import {createMongooseConnection} from "@API/Mongoose";
 import {loadCommands} from "@Utils/CommandsLoader";
+import {loadWorker} from "@Utils/WorkerLoader";
+import {loadCronJobs} from "@Utils/CronJobsLoader";
 
 dotenv.config();
 
@@ -25,12 +27,12 @@ loadMiddlewares(http).then(() => {
 loadRoutes(http).then(() => {
     Logger.info('Routes loaded', 'ROUTES');
 });
-// loadWorker().then(() => {
-//     Logger.info('Workers loaded', 'QUEUE');
-// });
-// loadCronJobs().then(() => {
-//     Logger.info('Cron jobs loaded', 'CRON');
-// });
+loadWorker().then(() => {
+    Logger.info('Workers loaded', 'QUEUE');
+});
+loadCronJobs().then(() => {
+    Logger.info('Cron jobs loaded', 'CRON');
+});
 
 http.listen(Number(process.env.PORT) || 3000);
 

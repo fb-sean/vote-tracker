@@ -19,4 +19,5 @@ export enum EWorkerJobs {
     SendMessage = 'SEND_MESSAGE',
     GiveRoles = 'GIVE_ROLES',
     SendExternalWebhook = 'SEND_EXTERNAL_WEBHOOK',
+    RemoveRoles = 'REMOVE_ROLES',
 }

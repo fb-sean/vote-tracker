@@ -166,13 +166,11 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
 export async function handleListBack(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.'});
+        return ctx.reply({content: 'Edit session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
-    // In edit mode, don't allow going back to step 1 or 0
-    // The entity type and ID are already set
     if (state.editing_id && state.current_step <= 2) {
-        return ctx.reply({content: 'Cannot go back further. The entity type and ID are already set.'});
+        return ctx.reply({content: 'Cannot go back further. The entity type and ID are already set.', flags: MessageFlags.Ephemeral});
     }
 
     if (state.current_step === 1) {

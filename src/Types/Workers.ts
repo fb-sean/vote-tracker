@@ -85,3 +85,9 @@ export interface IUserData {
     username: string;
     avatar: string;
 }
+
+export interface IRemoveRolesPayload {
+    guild_id: string;
+    user_id: string;
+    role_id: string;
+}

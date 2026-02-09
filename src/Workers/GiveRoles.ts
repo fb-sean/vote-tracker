@@ -1,8 +1,10 @@
 import {TWorker, IWorkerPayloadData, EWorkerJobs} from "@Types/RedisQueue";
 import SettingsModel from "@Schemas/Settings";
+import TemporaryRoleModel from "@Schemas/TemporaryRole";
 import {DiscordClient} from "@API/DiscordClient";
 import {Routes} from "discord-api-types/v10";
 import Redis from "@API/RedisCache";
+import RedisQueue from "@API/RedisQueue";
 import Logger from "@Utils/Logger";
 import type {IGiveRolesPayload} from "@Types/Workers";
 
@@ -54,8 +56,8 @@ export default class GiveRolesWorker implements TWorker {
                 return;
             }
 
-            for (const roleId of rolesToGive) {
-                await this.giveRoleWithRateLimit(guildId, data.user_id, roleId);
+            for (const roleToGive of rolesToGive) {
+                await this.giveRoleWithRateLimit(guildId, data.user_id, roleToGive.roleId, roleToGive.durationMin);
             }
 
             const duration = Date.now() - startTime;
@@ -69,15 +71,18 @@ export default class GiveRolesWorker implements TWorker {
     private async determineRoles(
         rewards: unknown,
         payload: IGiveRolesPayload
-    ): Promise<string[]> {
-        const rolesToGive: string[] = [];
-        const rewardArray = rewards as Array<{role_id?: string | null; min_votes?: number}>;
+    ): Promise<Array<{roleId: string; durationMin: number}>> {
+        const rolesToGive: Array<{roleId: string; durationMin: number}> = [];
+        const rewardArray = rewards as Array<{role_id?: string | null; min_votes?: number; duration_min?: number}>;
 
         if (rewardArray && rewardArray.length > 0) {
             for (const reward of rewardArray) {
                 if (payload.vote_counts.all >= (reward.min_votes || 0)) {
                     if (reward.role_id) {
-                        rolesToGive.push(reward.role_id);
+                        rolesToGive.push({
+                            roleId: reward.role_id,
+                            durationMin: reward.duration_min || 0,
+                        });
                     }
                 }
             }
@@ -88,8 +93,18 @@ export default class GiveRolesWorker implements TWorker {
 
     private async checkUserInGuild(guildId: string, userId: string): Promise<boolean> {
         try {
+            const cacheKey = `discord:vt:user_in_guild:${guildId}:${userId}`;
+            const cached = await Redis.getInstance().get<string>(cacheKey);
+
+            if (cached !== null) {
+                return cached === 'true';
+            }
+
             const bot = DiscordClient.getInstance();
             await bot.rest.get(Routes.guildMember(guildId, userId));
+
+            await Redis.getInstance().set(cacheKey, 'true', 900);
+
             return true;
         } catch {
             return false;
@@ -99,11 +114,20 @@ export default class GiveRolesWorker implements TWorker {
     private async giveRoleWithRateLimit(
         guildId: string,
         userId: string,
-        roleId: string
+        roleId: string,
+        durationMin: number
     ): Promise<void> {
         const bot = DiscordClient.getInstance();
 
-        const rateLimitKey = 'discord:rate_limit:roles';
+        const permCacheKey = `discord:vt:guild_role_no_perms:${guildId}`;
+        const hasNoPerms = await Redis.getInstance().get<string>(permCacheKey);
+
+        if (hasNoPerms === 'true') {
+            Logger.warn(`Guild ${guildId} has no role permissions (cached), skipping`, 'GIVE_ROLES');
+            return;
+        }
+
+        const rateLimitKey = 'discord:vt:rate_limit:roles';
         const maxTokens = 10;
         const refillRate = 10;
         const window = 1000;
@@ -112,7 +136,7 @@ export default class GiveRolesWorker implements TWorker {
 
         if (!acquired) {
             await this.sleep(100);
-            return this.giveRoleWithRateLimit(guildId, userId, roleId);
+            return this.giveRoleWithRateLimit(guildId, userId, roleId, durationMin);
         }
 
         try {
@@ -121,20 +145,44 @@ export default class GiveRolesWorker implements TWorker {
                 {}
             );
             Logger.info(`Gave role ${roleId} to ${userId}`, 'GIVE_ROLES');
+
+            if (durationMin > 0) {
+                const expiresAt = new Date(Date.now() + durationMin * 60 * 1000);
+
+                await TemporaryRoleModel.create({
+                    guild_id: guildId,
+                    user_id: userId,
+                    role_id: roleId,
+                    expires_at: expiresAt,
+                });
+
+                Logger.info(`Scheduled role removal for ${roleId} from ${userId} at ${expiresAt.toISOString()}`, 'GIVE_ROLES');
+            }
         } catch (error: unknown) {
-            const err = error as { code?: number; retry_after?: number };
-            if (err.code === 429) {
-                const retryAfter = err.retry_after || 1;
+            const discordError = error as { code?: number; retry_after?: number };
+            if (discordError.code === 429) {
+                const retryAfter = discordError.retry_after || 1;
+
                 Logger.warn(`Rate limited on roles, waiting ${retryAfter}s`, 'GIVE_ROLES');
 
-                await Redis.getInstance().set('discord:rate_limited:roles', 'true', Math.ceil(retryAfter));
+                await Redis.getInstance().set('discord:vt:rate_limited:roles', 'true', Math.ceil(retryAfter));
 
                 await this.sleep(retryAfter * 1000);
-                return this.giveRoleWithRateLimit(guildId, userId, roleId);
+
+                return this.giveRoleWithRateLimit(guildId, userId, roleId, durationMin);
             }
 
-            if (err.code === 10007 || err.code === 10013) {
+            if (discordError.code === 10007 || discordError.code === 10013) {
                 Logger.warn(`User ${userId} or role ${roleId} not found in guild ${guildId}`, 'GIVE_ROLES');
+
+                return;
+            }
+
+            if (discordError.code === 50001 || discordError.code === 50013 || discordError.code === 10011 || discordError.code === 10012) {
+                Logger.warn(`No permissions for roles in guild ${guildId}, caching failure`, 'GIVE_ROLES');
+
+                await Redis.getInstance().set(permCacheKey, 'true', 900);
+
                 return;
             }
 
