@@ -18,13 +18,17 @@ import {
     handleSetupFinish,
     handleSetupFirstVoteModal,
     handleSetupNext,
+    handleSetupPlatformBack,
+    handleSetupPlatformDiscordBotList,
+    handleSetupPlatformDiscordsCom,
+    handleSetupPlatformTopGG,
     handleSetupRemoveReward,
     handleSetupServer,
     handleSetupTestChannel,
     handleSetupVoteModal,
     handleSetupWebhookModal,
 } from "@Handlers/SetupHandlers";
-import {handleListEdit, handleListDump,} from "@Handlers/ListHandlers";
+import {handleListDelete, handleListDeleteCancel, handleListDeleteConfirm, handleListEdit, handleListDump,} from "@Handlers/ListHandlers";
 import {createSetupState, getAllSetupsForServer, buildSetupList} from "@Utils/SetupManager";
 import {buildEntitySelectionStep} from "@Utils/SetupComponents";
 
@@ -154,32 +158,39 @@ export default class InteractionRoute implements TRoute {
                     if (parts[2] === 'entityid') {
                         return handleSetupEnterEntityId(ctx, setupId);
                     }
+
                     if (parts[2] === 'webhook') {
                         return handleSetupEnterWebhook(ctx, setupId);
                     }
+
                     break;
                 case 'select':
                     if (parts[2] === 'channel') {
                         return handleSetupChannelSelect(ctx, setupId);
                     }
+
                     break;
                 case 'test':
                     if (parts[2] === 'channel') {
                         return handleSetupTestChannel(ctx, setupId);
                     }
+
                     break;
                 case 'edit':
                     if (parts[2] === 'firstvote') {
                         return handleSetupEditFirstVote(ctx, setupId);
                     }
+
                     if (parts[2] === 'vote') {
                         return handleSetupEditVote(ctx, setupId);
                     }
+
                     break;
                 case 'add':
                     if (parts[2] === 'reward') {
                         return handleSetupAddReward(ctx, setupId);
                     }
+
                     break;
                 case 'remove':
                     if (parts[2] === 'reward') {
@@ -187,15 +198,35 @@ export default class InteractionRoute implements TRoute {
 
                         return handleSetupRemoveReward(ctx, setupId, rewardIndex);
                     }
+
                     break;
                 case 'finish':
                     return handleSetupFinish(ctx, setupId);
+                case 'platform':
+                    if (parts[2] === 'topgg') {
+                        return handleSetupPlatformTopGG(ctx, setupId);
+                    }
+
+                    if (parts[2] === 'discordbotlist') {
+                        return handleSetupPlatformDiscordBotList(ctx, setupId);
+                    }
+
+                    if (parts[2] === 'discordscom') {
+                        return handleSetupPlatformDiscordsCom(ctx, setupId);
+                    }
+
+                    if (parts[2] === 'back') {
+                        return handleSetupPlatformBack(ctx, setupId);
+                    }
+
+                    break;
                 default:
                     return ctx.reply({content: 'Unknown setup action.'});
             }
         } catch (error) {
             Logger.error(`Error handling setup component ${action}: ${error}`, 'SETUP');
             console.log(error);
+
             return ctx.reply({content: 'An error occurred while processing your request.'});
         }
     }
@@ -212,12 +243,14 @@ export default class InteractionRoute implements TRoute {
 
         const getValue = (customId: string): string => {
             const component = components.find((c: any) => c.component?.custom_id === customId || c.components?.[0]?.custom_id === customId);
+
             return component?.component?.value || component?.components?.[0]?.value || '';
         };
 
         const getSelectValue = (customId: string): string => {
             const component = components.find((c: any) => c.component?.custom_id === customId || c.components?.[0]?.custom_id === customId);
             const values = component?.component?.values || component?.components?.[0]?.values;
+
             return values && values.length > 0 ? values[0] : '';
         };
 
@@ -239,22 +272,29 @@ export default class InteractionRoute implements TRoute {
         } catch (error) {
             Logger.error(`Error handling setup modal ${modalType}: ${error}`, 'SETUP');
             console.log(error);
+
             return ctx.reply({content: 'An error occurred while processing your request.'});
         }
     }
 
     async handleListComponent(ctx: Context, parts: string[]) {
         const action = parts[1];
+        const setupId = parts[2];
 
         try {
             switch (action) {
                 case 'edit':
-                    const setupId = parts[2];
-                    const serverId = parts[3];
-                    return handleListEdit(ctx, setupId, serverId);
+                    return handleListEdit(ctx, setupId);
                 case 'dump':
-                    const dumpSetupId = parts[2];
-                    return handleListDump(ctx, dumpSetupId);
+                    return handleListDump(ctx, setupId);
+                case 'delete':
+                    if (parts[2] === 'confirm') {
+                        return handleListDeleteConfirm(ctx, setupId);
+                    }
+                    if (parts[2] === 'cancel') {
+                        return handleListDeleteCancel(ctx, setupId);
+                    }
+                    return handleListDelete(ctx, setupId);
                 default:
                     return ctx.reply({content: 'Unknown list action.'});
             }

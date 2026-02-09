@@ -22,6 +22,7 @@ const VoteSchema = new Schema(
 );
 
 VoteSchema.index({entity_id: 1, entity_type: 1, user_id: 1});
+VoteSchema.index({user_id: 1});
 
 export type Vote = InferSchemaType<typeof VoteSchema> & { _id: Types.ObjectId };
 

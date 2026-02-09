@@ -19,10 +19,9 @@ export default class ListCommand implements Command {
         }
 
         const setups = await getAllSetupsForServer(ctx.interaction.guild_id!);
-        const payload = buildSetupList(setups, ctx.interaction.guild_id!);
 
         return ctx.reply({
-            ...payload,
+            ...buildSetupList(setups, ctx.interaction.guild_id!),
             flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
         });
     }

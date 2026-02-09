@@ -56,13 +56,13 @@ export async function createSetupState(serverId: string, userId: string): Promis
         editing_id: null,
     };
 
-    await Redis.getInstance().set(`setup:${setupId}`, initialState, 60 * 30);
+    await Redis.getInstance().set(`discord:vt:setup:${setupId}`, initialState, 60 * 30);
 
     return setupId;
 }
 
 export async function getSetupState(setupId: string): Promise<TSetupState | null> {
-    return Redis.getInstance().get<TSetupState>(`setup:${setupId}`);
+    return Redis.getInstance().get<TSetupState>(`discord:vt:setup:${setupId}`);
 }
 
 export async function updateSetupState(setupId: string, updates: Partial<TSetupState>): Promise<TSetupState | null> {
@@ -72,13 +72,13 @@ export async function updateSetupState(setupId: string, updates: Partial<TSetupS
     }
 
     const updated = {...current, ...updates};
-    await Redis.getInstance().set(`setup:${setupId}`, updated, 60 * 30);
+    await Redis.getInstance().set(`discord:vt:setup:${setupId}`, updated, 60 * 30);
 
     return updated;
 }
 
 export async function deleteSetupState(setupId: string): Promise<void> {
-    await Redis.getInstance().delete(`setup:${setupId}`);
+    await Redis.getInstance().delete(`discord:vt:setup:${setupId}`);
 }
 
 export async function getCurrentStep(setupId: string): Promise<TSetupStep | null> {
@@ -196,7 +196,7 @@ export async function createEditState(setupId: string, userId: string): Promise<
         editing_id: setupId,
     };
 
-    await Redis.getInstance().set(`setup:${sessionId}`, editState, 60 * 30);
+    await Redis.getInstance().set(`discord:vt:setup:${sessionId}`, editState, 60 * 30);
 
     return sessionId;
 }

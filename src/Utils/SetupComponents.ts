@@ -55,13 +55,9 @@ export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMes
 }
 
 export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server'): RESTPostAPIChannelMessageJSONBody {
-    const title = entityType === 'bot' ? 'Enter Your Bot ID' : 'Enter Your Server ID';
     const description = entityType === 'bot'
         ? 'Enter the bot ID you want to track votes for.'
         : 'Enter the server ID you want to track votes for.';
-    const hint = entityType === 'bot'
-        ? '> 💡 You can find this in the URL of your bot page on the voting platform.'
-        : '> 💡 You can find this in the URL of your server page on the voting platform.';
 
     return {
         components: [
@@ -74,8 +70,14 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server')
                 content: description,
             },
             {
-                type: ComponentType.TextDisplay,
-                content: hint,
+                type: ComponentType.Container,
+                accent_color: 15548997,
+                components: [
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '## ⚠️ Important: Use Your Real Discord ID\nPlease enter your **actual Discord application ID** (for bots) or **Discord server ID** (for servers).\n\n**Do NOT** use the ID from the top.gg URL - those are different from your actual Discord IDs!',
+                    },
+                ],
             },
             {
                 type: ComponentType.Separator,
@@ -313,18 +315,21 @@ export function buildMessagesStep(setupId: string, state: TSetupState): RESTPost
                     '- {user.mention}\n' +
                     '- {user.displayName}\n' +
                     '- {user.id}\n' +
+                    '- {user.avatarUrl}\n' +
                     '- {votes.count.all}\n' +
                     '- {votes.count.thisMonth}\n' +
                     '- {votes.count.thisYear}\n' +
                     '- {votes.count.thisWeek}\n' +
+                    '- {votes.streak.current}\n' +
+                    '- {votes.streak.best}\n' +
                     '- {votes.lastVote}\n' +
-                    '- {entity.name}\n' +
+                    '- {entity.type}\n' +
                     '- {entity.id}\n' +
                     '- {platform}\n'
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '> 💡 The bot fully supports components and/or embeds in these messages. Just provide the raw JSON payload as you would send to Discord\'s API.',
+                content: '> 💡 The bot fully supports components and/or embeds in these messages. Just provide the raw JSON payload as you would send to Discord\'s API. You can also use <https://discord.builders>',
             },
             {
                 type: ComponentType.Separator,
@@ -584,7 +589,7 @@ export function buildAddRewardModal(setupId: string): APIModalInteractionRespons
     };
 }
 
-export function buildCompleteStep(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string): RESTPostAPIChannelMessageJSONBody {
+export function buildCompleteStep(setupId: string, state: TSetupState): RESTPostAPIChannelMessageJSONBody {
     const configSummary = [
         `**Type:** ${state.entity_type === 'bot' ? 'Bot' : 'Server'}`,
         `**Entity ID:** ${state.entity_id}`,
@@ -593,6 +598,9 @@ export function buildCompleteStep(setupId: string, state: TSetupState, webhookUr
         state.rewards.length > 0 ? `**Reward Roles:** ${state.rewards.length}` : '**Reward Roles:** None',
         state.messages.length > 0 ? `**Messages:** ${state.messages.length} configured` : '**Messages:** Defaults',
     ].join('\n');
+
+    const entityType = state.entity_type || 'bot';
+    const showDiscordBotList = entityType === 'bot';
 
     return {
         components: [
@@ -616,21 +624,47 @@ export function buildCompleteStep(setupId: string, state: TSetupState, webhookUr
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '## Webhook URL',
+                content: '## Choose Your Platform',
             },
             {
-                type: ComponentType.Container,
-                accent_color: 5763719,
-                components: [
-                    {
-                        type: ComponentType.TextDisplay,
-                        content: `Use this URL in your bot/server voting platform:\n\`\`\`\n${webhookUrl}\n\`\`\`\nAuth Token: ||${maskedToken}||`,
-                    },
-                ],
+                type: ComponentType.TextDisplay,
+                content: 'Select a voting platform to connect your webhook. Click on a platform to see detailed instructions.',
             },
             {
                 type: ComponentType.Separator,
                 spacing: 1,
+            },
+            {
+                type: ComponentType.ActionRow,
+                components: [
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Primary,
+                        label: 'top.gg',
+                        emoji: {name: '🔗'},
+                        custom_id: `setup_platform_topgg_${setupId}`,
+                    },
+                    ...(showDiscordBotList ? [{
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Primary,
+                        label: 'discordbotlist.com',
+                        emoji: {name: '🔗'},
+                        custom_id: `setup_platform_discordbotlist_${setupId}`,
+                    } as const] : []),
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Primary,
+                        label: 'discords.com',
+                        emoji: {name: '🔗'},
+                        custom_id: `setup_platform_discordscom_${setupId}`,
+                    },
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Link,
+                        label: 'Need a different platform?',
+                        url: 'https://discord.gg/ZVERh35',
+                    },
+                ],
             },
             {
                 type: ComponentType.ActionRow,
@@ -646,6 +680,231 @@ export function buildCompleteStep(setupId: string, state: TSetupState, webhookUr
                         style: ButtonStyle.Danger,
                         label: 'Cancel',
                         custom_id: `setup_cancel_${setupId}`,
+                    },
+                ],
+            },
+        ],
+    };
+}
+
+export function buildPlatformTopGGGuide(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string, hasExistingConnection = false): RESTPostAPIChannelMessageJSONBody {
+    const entityType = state.entity_type === 'bot' ? 'bot' : 'server';
+    const entityId = state.entity_id || '';
+
+    const components: any[] = [
+        {
+            type: ComponentType.TextDisplay,
+            content: '# Connect to top.gg',
+        },
+        {
+            type: ComponentType.Container,
+            accent_color: 5763719,
+            components: [
+                {
+                    type: ComponentType.TextDisplay,
+                    content: '## Step-by-Step Guide',
+                },
+            ],
+        },
+    ];
+
+    if (hasExistingConnection) {
+        components.push({
+            type: ComponentType.Container,
+            accent_color: 5763719,
+            components: [
+                {
+                    type: ComponentType.TextDisplay,
+                    content: '## ✅ Already Connected!\nA top.gg connection for this entity already exists. Everything is set up and you\'re ready to go - no further action needed!',
+                },
+            ],
+        });
+    } else {
+        components.push({
+            type: ComponentType.TextDisplay,
+            content: `### 1. Visit the Integrations Page\nNavigate to:\n<https://top.gg/discord/${entityType}/${entityId}/dashboard/integrations>\n`,
+        });
+        components.push({
+            type: ComponentType.Separator,
+            spacing: 1,
+        });
+        components.push({
+            type: ComponentType.TextDisplay,
+            content: '### 2. Find the "Votes" Bot\nLook for the bot named **"Votes"** in the integrations list.',
+        });
+        components.push({
+            type: ComponentType.Separator,
+            spacing: 1,
+        });
+        components.push({
+            type: ComponentType.TextDisplay,
+            content: '### 3. Click "Install"\nClick the **"Install"** button on the "Votes" bot to connect it.\n\n> 💡 No URL or webhook configuration needed - just install the "Votes" bot!',
+        });
+    }
+
+    components.push({
+        type: ComponentType.Separator,
+        spacing: 1,
+    });
+    components.push({
+        type: ComponentType.ActionRow,
+        components: [
+            {
+                type: ComponentType.Button,
+                style: ButtonStyle.Secondary,
+                label: 'Back',
+                custom_id: `setup_platform_back_${setupId}`,
+            },
+            {
+                type: ComponentType.Button,
+                style: ButtonStyle.Success,
+                label: 'Finish Setup',
+                custom_id: `setup_finish_${setupId}`,
+            },
+        ],
+    });
+
+    return {components};
+}
+
+export function buildPlatformDiscordBotListGuide(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string): RESTPostAPIChannelMessageJSONBody {
+    const entityId = state.entity_id || '';
+
+    return {
+        components: [
+            {
+                type: ComponentType.TextDisplay,
+                content: '# Connect to discordbotlist.com',
+            },
+            {
+                type: ComponentType.Container,
+                accent_color: 5763719,
+                components: [
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '## Step-by-Step Guide',
+                    },
+                ],
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: `### 1. Visit Your Bot Page\nNavigate to:\n<https://discordbotlist.com/bots/${entityId}/edit>\n`,
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: '### 2. Go to Webhook Settings\nLook for "Upvote Webhook" in your bot dashboard.',
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: `### 3. Add Your Webhook URL\nEnter the following URL:\n\`\`\`\n${webhookUrl}\n\`\`\`\n\nThe auth token is included in the URL automatically.`,
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.ActionRow,
+                components: [
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Secondary,
+                        label: 'Back',
+                        custom_id: `setup_platform_back_${setupId}`,
+                    },
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Success,
+                        label: 'Finish Setup',
+                        custom_id: `setup_finish_${setupId}`,
+                    },
+                ],
+            },
+        ],
+    };
+}
+
+export function buildPlatformDiscordsComGuide(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string): RESTPostAPIChannelMessageJSONBody {
+    const entityType = state.entity_type === 'bot' ? 'bot' : 'servers'; // Note: discords.com uses "servers" not "server"
+    const entityId = state.entity_id || '';
+
+    return {
+        components: [
+            {
+                type: ComponentType.TextDisplay,
+                content: '# Connect to discords.com',
+            },
+            {
+                type: ComponentType.Container,
+                accent_color: 5763719,
+                components: [
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '## Step-by-Step Guide',
+                    },
+                ],
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: `### 1. Visit the Integrations Page\nNavigate to:\n<https://discords.com/${entityType}/${entityId}/dashboard/integrations>`,
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: '### 2. Find Vote Webhooks\nLook for "Vote Webhooks" or "Webhooks" section in the integrations.',
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: `### 3. Add Your Webhook URL\nEnter the following URL:\n\`\`\`\n${webhookUrl}\n\`\`\`\n\nThe auth token is included in the URL automatically.`,
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: '> 💡 discords.com supports both bots and servers. Make sure you select the correct entity type!',
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.ActionRow,
+                components: [
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Secondary,
+                        label: 'Back',
+                        custom_id: `setup_platform_back_${setupId}`,
+                    },
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Success,
+                        label: 'Finish Setup',
+                        custom_id: `setup_finish_${setupId}`,
                     },
                 ],
             },

@@ -16,6 +16,7 @@ class RedisQueue {
         if (!RedisQueue._instance) {
             RedisQueue._instance = new RedisQueue(Redis.getInstance().getClient());
         }
+
         return RedisQueue._instance;
     }
 

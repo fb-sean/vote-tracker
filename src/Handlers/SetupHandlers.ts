@@ -27,10 +27,14 @@ import {
     buildExternalWebhookModal,
     buildFirstVoteMessageModal,
     buildMessagesStep,
+    buildPlatformDiscordBotListGuide,
+    buildPlatformDiscordsComGuide,
+    buildPlatformTopGGGuide,
     buildRewardsStep,
     buildVoteMessageModal,
 } from "@Utils/SetupComponents";
 import Redis from "@API/RedisCache";
+import TopggConnectionModel from "@Schemas/Integrations/Topgg";
 
 function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: number) {
     return {
@@ -166,10 +170,7 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
             return ctx.reply({content: 'Setup session expired.'});
         }
 
-        const webhookUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/webhook/vote`;
-        const maskedToken = authToken.substring(0, 8) + '...' + authToken.substring(authToken.length - 4);
-
-        return ctx.update(buildPayload(buildCompleteStep(setupId, updated, webhookUrl, maskedToken)));
+        return ctx.update(buildPayload(buildCompleteStep(setupId, updated)));
     }
 
     const next = await nextStep(setupId);
@@ -216,7 +217,7 @@ export async function handleSetupTestChannel(ctx: Context, setupId: string) {
         });
     }
 
-    const cooldown = await Redis.getInstance().get('vote-tracker:test:cooldown:' + state.channel_id);
+    const cooldown = await Redis.getInstance().get('discord:vt:test:cooldown:' + state.channel_id);
     if (cooldown) {
         return ctx.reply({
             content: 'Test message already sent in the last 2 minutes. Please wait for 2 minutes before sending another test message.',
@@ -224,7 +225,7 @@ export async function handleSetupTestChannel(ctx: Context, setupId: string) {
         });
     }
 
-    await Redis.getInstance().set('vote-tracker:test:cooldown:' + state.channel_id, true, 2 * 60)
+    await Redis.getInstance().set('discord:vt:test:cooldown:' + state.channel_id, true, 2 * 60)
 
     try {
         await DiscordClient.getInstance().rest.post(Routes.channelMessages(state.channel_id), {
@@ -346,11 +347,7 @@ export async function handleSetupFinish(ctx: Context, setupId: string) {
             {
                 type: ComponentType.TextDisplay,
                 content: 'Your vote tracking setup has been saved successfully!',
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: 'You can now use the webhook URL provided in the previous step to receive vote notifications.',
-            },
+            }
         ],
     }));
 }
@@ -540,11 +537,58 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
     }
 
     if (step === 5) {
-        const webhookUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/webhook/vote`;
-        const maskedToken = state.auth_token ? state.auth_token.substring(0, 8) + '...' + state.auth_token.substring(state.auth_token.length - 4) : '...';
-
-        return ctx.update(buildPayload(buildCompleteStep(setupId, state, webhookUrl, maskedToken)));
+        return ctx.update(buildPayload(buildCompleteStep(setupId, state)));
     }
 
     return ctx.reply({content: 'Invalid step.'});
+}
+
+export async function handleSetupPlatformTopGG(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    const webhookUrl = `https://votes.discordbots.xyz/webhooks/top-gg/${state.auth_token}`;
+    const maskedToken = state.auth_token ? state.auth_token : '...';
+
+    const existingConnection = await TopggConnectionModel.findOne({
+        project_type: state.entity_type,
+        project_platform_id: state.entity_id,
+    });
+
+    return ctx.update(buildPayload(buildPlatformTopGGGuide(setupId, state, webhookUrl, maskedToken, !!existingConnection)));
+}
+
+export async function handleSetupPlatformDiscordBotList(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    const webhookUrl = `https://votes.discordbots.xyz/webhooks/dbl/${state.auth_token}`;
+    const maskedToken = state.auth_token ? state.auth_token : '...';
+
+    return ctx.update(buildPayload(buildPlatformDiscordBotListGuide(setupId, state, webhookUrl, maskedToken)));
+}
+
+export async function handleSetupPlatformDiscordsCom(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    const webhookUrl = `https://votes.discordbots.xyz/webhooks/dbl/${state.auth_token}`;
+    const maskedToken = state.auth_token ? state.auth_token : '...';
+
+    return ctx.update(buildPayload(buildPlatformDiscordsComGuide(setupId, state, webhookUrl, maskedToken)));
+}
+
+export async function handleSetupPlatformBack(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    return ctx.update(buildPayload(buildCompleteStep(setupId, state)));
 }

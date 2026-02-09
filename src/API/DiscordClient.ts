@@ -47,7 +47,7 @@ export class DiscordClient {
     }
 
     public async sendDirectMessage(userId: string, payload: IContextPayloadExtended) {
-        let channelId = await Redis.getInstance().get<string>('hda:user:dm:' + userId);
+        let channelId = await Redis.getInstance().get<string>('discord:vt:user:dm:' + userId);
         if (!channelId) {
             const channel = await this.rest.post(
                 Routes.userChannels(),
@@ -63,7 +63,7 @@ export class DiscordClient {
             }
 
             channelId = channel.id;
-            await Redis.getInstance().set('hda:user:dm:' + userId, channelId, 60 * 2);
+            await Redis.getInstance().set('discord:vt:user:dm:' + userId, channelId, 60 * 2);
         }
 
         const files = payload.files ? payload.files : [];

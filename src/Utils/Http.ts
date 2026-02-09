@@ -111,7 +111,7 @@ export async function setSession(req: TIncomingMessage, res: TServerResponse, da
         setCookies(res, {session: sessionId});
     }
 
-    await Redis.getInstance().set<Record<string, any>>('hda:session-' + sessionId, {
+    await Redis.getInstance().set<Record<string, any>>('discord:vt:session-' + sessionId, {
         ...data,
         createdAt: new Date()
     });
@@ -122,7 +122,7 @@ export async function deleteSession(req: TIncomingMessage, res: TServerResponse)
     const sessionId = cookies.session;
 
     if (sessionId) {
-        await Redis.getInstance().delete('hda:session-' + sessionId);
+        await Redis.getInstance().delete('discord:vt:session-' + sessionId);
         setCookies(res, {session: ''});
     }
 }
@@ -131,7 +131,7 @@ export async function getSession(req: TIncomingMessage): Promise<Record<string, 
     const cookies = getCookies(req);
 
     if (cookies.session) {
-        const session = await Redis.getInstance().get<Record<string, any> | undefined>('hda:session-' + cookies.session);
+        const session = await Redis.getInstance().get<Record<string, any> | undefined>('discord:vt:session-' + cookies.session);
 
         if (session && session.createdAt && (new Date(session.createdAt)).getTime() + 1000 * 60 * 60 * 24 * 7 > Date.now()) {
             return session;

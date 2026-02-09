@@ -15,7 +15,7 @@ function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: num
     };
 }
 
-export async function handleListEdit(ctx: Context, setupId: string, serverId: string) {
+export async function handleListEdit(ctx: Context, setupId: string) {
     const editSessionId = await createEditState(setupId, ctx.user.id);
     if (!editSessionId) {
         return ctx.reply({content: 'Failed to load setup. It may have been deleted.'});
@@ -140,6 +140,12 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
                         {
                             type: ComponentType.Button,
                             style: 4,
+                            label: 'Delete Setup',
+                            custom_id: `list_delete_${setupId}`,
+                        },
+                        {
+                            type: ComponentType.Button,
+                            style: 2,
                             label: 'Cancel',
                             custom_id: `setup_cancel_${setupId}`,
                         },
@@ -256,4 +262,121 @@ export async function handleListDump(ctx: Context, setupId: string) {
         files: [{name: fileName, data: fileContent}],
         flags: MessageFlags.Ephemeral,
     });
+}
+
+export async function handleListDelete(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply({content: 'Edit session expired. Please start over.'});
+    }
+
+    if (!state.editing_id) {
+        return ctx.reply({content: 'Cannot delete: this is a new setup, not an existing one.'});
+    }
+
+    // Show delete confirmation
+    return ctx.update(buildPayload({
+        components: [
+            {
+                type: ComponentType.TextDisplay,
+                content: '# ⚠️ Delete Setup',
+            },
+            {
+                type: ComponentType.Container,
+                accent_color: 15548997, // Red color for warning
+                components: [
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: `## Are you sure?\n\nYou are about to delete the vote tracking setup for:\n**Type:** ${state.entity_type === 'bot' ? 'Bot' : 'Server'}\n**Entity ID:** ${state.entity_id}\n\nThis action **cannot be undone**. All configuration including rewards, messages, and webhook settings will be permanently lost.`,
+                    },
+                ],
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: '> 💡 Consider using "Dump JSON" to backup your configuration before deleting.',
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.ActionRow,
+                components: [
+                    {
+                        type: ComponentType.Button,
+                        style: 4, // Danger
+                        label: 'Yes, Delete It',
+                        custom_id: `list_delete_confirm_${setupId}`,
+                    },
+                    {
+                        type: ComponentType.Button,
+                        style: 2, // Secondary
+                        label: 'Cancel',
+                        custom_id: `list_delete_cancel_${setupId}`,
+                    },
+                ],
+            },
+        ],
+    }));
+}
+
+export async function handleListDeleteConfirm(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply({content: 'Edit session expired. Please start over.'});
+    }
+
+    if (!state.editing_id) {
+        return ctx.reply({content: 'Cannot delete: this is a new setup, not an existing one.'});
+    }
+
+    const SettingsModel = (await import('@Schemas/Settings')).default;
+
+    // Delete the setup from database
+    await SettingsModel.deleteOne({_id: state.editing_id});
+
+    // Clean up the edit session
+    const {deleteSetupState} = await import('@Utils/SetupManager');
+    await deleteSetupState(setupId);
+
+    return ctx.update(buildPayload({
+        components: [
+            {
+                type: ComponentType.TextDisplay,
+                content: '# ✅ Setup Deleted',
+            },
+            {
+                type: ComponentType.Container,
+                accent_color: 5763719, // Blue color
+                components: [
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: 'The vote tracking setup has been permanently deleted.',
+                    },
+                ],
+            },
+            {
+                type: ComponentType.Separator,
+                spacing: 1,
+            },
+            {
+                type: ComponentType.TextDisplay,
+                content: 'Use `/list` to view your remaining setups or `/setup` to create a new one.',
+            },
+        ],
+    }));
+}
+
+export async function handleListDeleteCancel(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply({content: 'Edit session expired. Please start over.'});
+    }
+
+    // Return to the review page
+    return refreshCurrentStep(ctx, setupId, state);
 }
