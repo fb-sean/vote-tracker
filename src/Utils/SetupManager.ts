@@ -1,5 +1,5 @@
 import {randomBytes} from "crypto";
-import {ComponentType} from "discord-api-types/v10";
+import {ButtonStyle, ComponentType} from "discord-api-types/v10";
 import Redis from "@API/RedisCache";
 import SettingsModel from "@Schemas/Settings";
 
@@ -106,10 +106,6 @@ export async function previousStep(setupId: string): Promise<TSetupState | null>
     }
 
     return updateSetupState(setupId, {current_step: state.current_step - 1});
-}
-
-export async function generateAuthToken(): Promise<string> {
-    return randomBytes(32).toString('hex');
 }
 
 export async function countSetupsForServer(serverId: string): Promise<number> {
@@ -236,7 +232,7 @@ export function buildSetupList(setups: any[], serverId: string) {
                 ],
                 accessory: {
                     type: ComponentType.Button,
-                    style: 2,
+                    style: ButtonStyle.Secondary,
                     label: 'Edit',
                     custom_id: `list_edit_${setup._id}_${serverId}`,
                 },

@@ -10,7 +10,6 @@ import {DiscordClient} from "@API/DiscordClient";
 import {
     countSetupsForServer,
     deleteSetupState,
-    generateAuthToken,
     getSetupState,
     nextStep,
     previousStep,
@@ -35,6 +34,7 @@ import {
 } from "@Utils/SetupComponents";
 import Redis from "@API/RedisCache";
 import TopggConnectionModel from "@Schemas/Integrations/Topgg";
+import {generateKey} from "@Utils/Key";
 
 function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: number) {
     return {
@@ -87,6 +87,12 @@ export async function handleSetupBack(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
         return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    // In edit mode, don't allow going back to step 1 or 0
+    // The entity type and ID are already set
+    if (state.editing_id && state.current_step <= 2) {
+        return ctx.reply({content: 'Cannot go back further. The entity type and ID are already set.'});
     }
 
     if (state.current_step === 0) {
@@ -161,10 +167,13 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
             if (!next) {
                 return ctx.reply({content: 'Cannot proceed further.'});
             }
-            return refreshCurrentStep(ctx, setupId, next);
+
+            const {refreshCurrentStep: listRefreshCurrentStep} = await import('@Handlers/ListHandlers');
+
+            return listRefreshCurrentStep(ctx, setupId, next);
         }
 
-        const authToken = await generateAuthToken();
+        const authToken = generateKey();
         const updated = await updateSetupState(setupId, {auth_token: authToken});
         if (!updated) {
             return ctx.reply({content: 'Setup session expired.'});
@@ -390,11 +399,31 @@ export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, m
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
+    let payload = message.trim();
+
+    // Check if it's JSON and ensure ComponentsV2 flag is present
+    if (payload.startsWith('{') || payload.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(payload);
+            // If it's a components v2 payload (has 'components' property), ensure IsComponentsV2 flag
+            if (parsed.components && Array.isArray(parsed.components)) {
+                const flags = parsed.flags || 0;
+                const IsComponentsV2 = 1 << 24; // 16777216
+                if (!(flags & IsComponentsV2)) {
+                    parsed.flags = flags | IsComponentsV2;
+                    payload = JSON.stringify(parsed);
+                }
+            }
+        } catch {
+            // Not valid JSON, keep as-is
+        }
+    }
+
     const updatedMessages = state.messages.filter(m => m.type !== 'first-vote');
-    if (message && message.trim().length > 0) {
+    if (payload.length > 0) {
         updatedMessages.push({
             type: 'first-vote',
-            payload: message.trim(),
+            payload: payload,
         });
     }
 
@@ -412,11 +441,31 @@ export async function handleSetupVoteModal(ctx: Context, setupId: string, messag
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
+    let payload = message.trim();
+
+    // Check if it's JSON and ensure ComponentsV2 flag is present
+    if (payload.startsWith('{') || payload.startsWith('[')) {
+        try {
+            const parsed = JSON.parse(payload);
+            // If it's a components v2 payload (has 'components' property), ensure IsComponentsV2 flag
+            if (parsed.components && Array.isArray(parsed.components)) {
+                const flags = parsed.flags || 0;
+                const IsComponentsV2 = 1 << 24; // 16777216
+                if (!(flags & IsComponentsV2)) {
+                    parsed.flags = flags | IsComponentsV2;
+                    payload = JSON.stringify(parsed);
+                }
+            }
+        } catch {
+            // Not valid JSON, keep as-is
+        }
+    }
+
     const updatedMessages = state.messages.filter(m => m.type !== 'vote');
-    if (message && message.trim().length > 0) {
+    if (payload.length > 0) {
         updatedMessages.push({
             type: 'vote',
-            payload: message.trim(),
+            payload: payload,
         });
     }
 

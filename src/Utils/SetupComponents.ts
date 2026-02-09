@@ -243,19 +243,26 @@ export function buildExternalWebhookModal(setupId: string): APIModalInteractionR
         custom_id: `setup_modal_webhook_${setupId}`,
         components: [
             {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.TextInput,
-                        style: 1,
-                        custom_id: 'webhook_url',
-                        label: 'Your Webhook URL',
-                        placeholder: 'https://your-server.com/vote-notification',
-                        required: false,
-                        max_length: 500,
-                    },
-                ],
+                type: ComponentType.TextDisplay,
+                content: '**Webhook Payload Information**\n' +
+                    'Your webhook will receive POST requests with vote data. All fields listed below are sent in the request body as JSON.\n' +
+                    '**Required Fields**\n' +
+                    '• entity_type: "bot" or "server"\n• entity_id: Your bot/server ID\n• voterId: ID of the user who voted\n• platform: Where the vote came from (top.gg, etc.)\n' +
+                    '**Optional Fields**\n' +
+                    '• guildId: Server ID (when available)\n• count: {all, thisMonth, thisYear, thisWeek}\n• streak: {best, current, lastVote}\n\nAll optional fields may not always be present!',
             },
+            {
+                type: ComponentType.Label,
+                label: 'Your Webhook URL',
+                component: {
+                    type: ComponentType.TextInput,
+                    style: 1,
+                    custom_id: 'webhook_url',
+                    placeholder: 'https://your-server.com/vote-notification',
+                    required: false,
+                    max_length: 2000,
+                },
+            }
         ],
     };
 }
@@ -312,24 +319,24 @@ export function buildMessagesStep(setupId: string, state: TSetupState): RESTPost
                 type: ComponentType.TextDisplay,
                 content: '>>> 💡 Messages use Discord markdown.\n' +
                     'Available variables:\n' +
-                    '- {user.mention}\n' +
-                    '- {user.displayName}\n' +
-                    '- {user.id}\n' +
-                    '- {user.avatarUrl}\n' +
-                    '- {votes.count.all}\n' +
-                    '- {votes.count.thisMonth}\n' +
-                    '- {votes.count.thisYear}\n' +
-                    '- {votes.count.thisWeek}\n' +
-                    '- {votes.streak.current}\n' +
-                    '- {votes.streak.best}\n' +
-                    '- {votes.lastVote}\n' +
-                    '- {entity.type}\n' +
-                    '- {entity.id}\n' +
-                    '- {platform}\n'
+                    '- {user.mention} - <@813913649633951764>\n' +
+                    '- {user.displayName} - Votes\n' +
+                    '- {user.id} - 813913649633951764\n' +
+                    '- {user.avatarUrl} - <https://cdn.discordapp.com/avatars/813913649633951764/0b58922d67bb06a5924898361a6ff0ff.webp>\n' +
+                    '- {votes.count.all} - 1000\n' +
+                    '- {votes.count.thisMonth} - 500\n' +
+                    '- {votes.count.thisYear} - 1000\n' +
+                    '- {votes.count.thisWeek} - 50\n' +
+                    '- {votes.streak.current} - 12\n' +
+                    '- {votes.streak.best} - 357\n' +
+                    '- {votes.lastVote} - 1770667266 (UNIX timestamp)\n' +
+                    '- {entity.type} - "bot" or "server"\n' +
+                    '- {entity.id} - 813913649633951764\n' +
+                    '- {platform} - top.gg, etc.\n'
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '> 💡 The bot fully supports components and/or embeds in these messages. Just provide the raw JSON payload as you would send to Discord\'s API. You can also use <https://discord.builders>',
+                content: '> 💡 The bot fully supports components and/or embeds in these messages. Provide the raw JSON payload as you would send to Discord\'s API. You can also use <https://discord.builders>',
             },
             {
                 type: ComponentType.Separator,
