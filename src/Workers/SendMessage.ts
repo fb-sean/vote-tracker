@@ -1,7 +1,7 @@
 import {TWorker, IWorkerPayloadData, EWorkerJobs} from "@Types/RedisQueue";
 import SettingsModel from "@Schemas/Settings";
 import {DiscordClient} from "@API/DiscordClient";
-import {Routes, MessageFlags} from "discord-api-types/v10";
+import {Routes} from "discord-api-types/v10";
 import Redis from "@API/RedisCache";
 import Logger from "@Utils/Logger";
 import type {ISendMessagePayload, IMessagePlaceholders} from "@Types/Workers";
@@ -16,6 +16,8 @@ export default class SendMessageWorker implements TWorker {
     async execute(payload: IWorkerPayloadData): Promise<void> {
         const data = payload as unknown as ISendMessagePayload;
         const startTime = Date.now();
+
+        let d: any = null;
 
         try {
             Logger.info(`Sending message for ${data.user_id} from ${data.platform}`, 'SEND_MESSAGE');
@@ -59,7 +61,7 @@ export default class SendMessageWorker implements TWorker {
                 return;
             }
 
-            const parsedMessage = this.parseMessage(messageRaw, data);
+            const parsedMessage = d = this.parseMessage(messageRaw, data);
 
             await this.sendWithRateLimit(channelId, parsedMessage);
 
@@ -69,6 +71,7 @@ export default class SendMessageWorker implements TWorker {
         } catch (error) {
             Logger.error(`Error in SendMessage: ${error}`, 'SEND_MESSAGE');
             console.log(error);
+            console.log(d);
         }
     }
 
@@ -109,12 +112,19 @@ export default class SendMessageWorker implements TWorker {
                 return {
                     content: this.replacePlaceholders(content, placeholders),
                     components: components.length > 0 ? components : undefined,
-                    flags: MessageFlags.IsComponentsV2,
+                    flags: content === '' ? 1 << 15 : undefined,
                 };
             }
 
             if (parsed.content) {
                 parsed.content = this.replacePlaceholders(parsed.content as string, placeholders);
+            }
+
+            if (parsed.components && !parsed.content && !parsed.embeds) {
+                const flags = parsed.flags || 0;
+                if (!(flags & (1 << 15))) {
+                    parsed.flags = flags | (1 << 15);
+                }
             }
 
             return parsed;

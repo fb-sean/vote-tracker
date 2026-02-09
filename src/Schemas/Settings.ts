@@ -41,7 +41,7 @@ const SettingsSchema = new Schema(
             type: String,
         },
         entity_type: {
-            type: String, // 'bot' or 'server'
+            type: String, // 'bot', 'server', or 'game'
         },
         channel_id: {
             type: String,

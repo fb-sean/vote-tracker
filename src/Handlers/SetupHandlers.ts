@@ -66,6 +66,15 @@ export async function handleSetupServer(ctx: Context, setupId: string) {
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
 }
 
+export async function handleSetupGame(ctx: Context, setupId: string) {
+    const state = await updateSetupState(setupId, {entity_type: 'game', current_step: 1});
+    if (!state) {
+        return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'game')));
+}
+
 export async function handleSetupCancel(ctx: Context, setupId: string) {
     await deleteSetupState(setupId);
 
@@ -189,7 +198,13 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
 }
 
 export async function handleSetupEnterEntityId(ctx: Context, setupId: string) {
-    return ctx.showModal(buildEntityIdModal(setupId));
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    const entityType = state.entity_type || 'bot';
+    return ctx.showModal(buildEntityIdModal(setupId, entityType as 'bot' | 'server' | 'game'));
 }
 
 export async function handleSetupChannelSelect(ctx: Context, setupId: string) {
@@ -398,22 +413,18 @@ export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, m
     }
 
     let payload = message.trim();
-    const IsComponentsV2 = 1 << 24; // 16777216
+    const IsComponentsV2 = 1 << 15;
 
-    // Check if it's JSON and ensure ComponentsV2 flag is present
     if (payload.startsWith('{') || payload.startsWith('[')) {
         try {
             const parsed = JSON.parse(payload);
 
-            // If it's an array, wrap it as a Components v2 payload
             if (Array.isArray(parsed)) {
                 payload = JSON.stringify({
                     components: parsed,
                     flags: IsComponentsV2,
                 });
-            }
-            // If it's an object with 'components' property, ensure IsComponentsV2 flag
-            else if (parsed.components && Array.isArray(parsed.components)) {
+            } else if (parsed.components && !parsed.content && !parsed.embeds) {
                 const flags = parsed.flags || 0;
                 if (!(flags & IsComponentsV2)) {
                     parsed.flags = flags | IsComponentsV2;
@@ -421,7 +432,6 @@ export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, m
                 }
             }
         } catch {
-            // Not valid JSON, keep as-is
         }
     }
 
@@ -448,22 +458,18 @@ export async function handleSetupVoteModal(ctx: Context, setupId: string, messag
     }
 
     let payload = message.trim();
-    const IsComponentsV2 = 1 << 24; // 16777216
+    const IsComponentsV2 = 1 << 15;
 
-    // Check if it's JSON and ensure ComponentsV2 flag is present
     if (payload.startsWith('{') || payload.startsWith('[')) {
         try {
             const parsed = JSON.parse(payload);
 
-            // If it's an array, wrap it as a Components v2 payload
             if (Array.isArray(parsed)) {
                 payload = JSON.stringify({
                     components: parsed,
                     flags: IsComponentsV2,
                 });
-            }
-            // If it's an object with 'components' property, ensure IsComponentsV2 flag
-            else if (parsed.components && Array.isArray(parsed.components)) {
+            } else if (parsed.components && !parsed.content && !parsed.embeds) {
                 const flags = parsed.flags || 0;
                 if (!(flags & IsComponentsV2)) {
                     parsed.flags = flags | IsComponentsV2;
@@ -471,7 +477,6 @@ export async function handleSetupVoteModal(ctx: Context, setupId: string, messag
                 }
             }
         } catch {
-            // Not valid JSON, keep as-is
         }
     }
 
@@ -566,6 +571,12 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
                             label: 'Server',
                             custom_id: `setup_server_${setupId}`,
                         },
+                        {
+                            type: ComponentType.Button,
+                            style: 1,
+                            label: 'Game',
+                            custom_id: `setup_game_${setupId}`,
+                        },
                     ],
                 },
                 {
@@ -584,7 +595,7 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
     }
 
     if (step === 1) {
-        return ctx.update(buildPayload(buildEntityIdStep(setupId, state.entity_type || 'bot')));
+        return ctx.update(buildPayload(buildEntityIdStep(setupId, (state.entity_type || 'bot') as 'bot' | 'server' | 'game')));
     }
 
     if (step === 2) {

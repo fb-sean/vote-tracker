@@ -37,6 +37,12 @@ export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMes
                         label: 'Server',
                         custom_id: `setup_server_${setupId}`,
                     },
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Primary,
+                        label: 'Game',
+                        custom_id: `setup_game_${setupId}`,
+                    },
                 ],
             },
             {
@@ -54,10 +60,18 @@ export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMes
     };
 }
 
-export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server'): RESTPostAPIChannelMessageJSONBody {
+export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server' | 'game'): RESTPostAPIChannelMessageJSONBody {
     const description = entityType === 'bot'
         ? 'Enter the bot ID you want to track votes for.'
-        : 'Enter the server ID you want to track votes for.';
+        : entityType === 'server'
+            ? 'Enter the server ID you want to track votes for.'
+            : 'Enter the game ID you want to track votes for.';
+
+    const idHint = entityType === 'bot'
+        ? '## ⚠️ Important: Use Your Real Discord ID\nPlease enter your **actual Discord application ID** (for bots).\n\n**Do NOT** use the ID from the top.gg URL - those are different from your actual Discord IDs!'
+        : entityType === 'server'
+            ? '## ⚠️ Important: Use Your Real Discord ID\nPlease enter your **actual Discord server ID**.\n\n**Do NOT** use the ID from the top.gg URL - those are different from your actual Discord IDs!'
+            : '## ⚠️ Important: Use Your top.gg Game ID\nPlease enter the **top.gg game ID** from the URL.\n\nExample: For `https://top.gg/roblox/games/796498829106180096`, use `796498829106180096`';
 
     return {
         components: [
@@ -75,7 +89,7 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server')
                 components: [
                     {
                         type: ComponentType.TextDisplay,
-                        content: '## ⚠️ Important: Use Your Real Discord ID\nPlease enter your **actual Discord application ID** (for bots) or **Discord server ID** (for servers).\n\n**Do NOT** use the ID from the top.gg URL - those are different from your actual Discord IDs!',
+                        content: idHint,
                     },
                 ],
             },
@@ -115,20 +129,36 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server')
     };
 }
 
-export function buildEntityIdModal(setupId: string): APIModalInteractionResponseCallbackData {
+export function buildEntityIdModal(setupId: string, entityType: 'bot' | 'server' | 'game'): APIModalInteractionResponseCallbackData {
+    const label = entityType === 'bot'
+        ? 'Your Bot ID'
+        : entityType === 'server'
+            ? 'Your Server ID'
+            : 'Your Game ID';
+
+    const description = entityType === 'bot'
+        ? 'Enter your actual Discord application ID'
+        : entityType === 'server'
+            ? 'Enter your actual Discord server ID'
+            : 'Enter the top.gg game ID from the URL';
+
+    const placeholder = entityType === 'game'
+        ? '796498829106180096'
+        : 'Paste your ID here...';
+
     return {
         title: 'Enter Your ID',
         custom_id: `setup_modal_entityid_${setupId}`,
         components: [
             {
                 type: ComponentType.Label,
-                label: 'Your Bot or Server ID',
-                description: 'Enter your actual Discord application ID (bot) or Discord server ID',
+                label: label,
+                description: description,
                 component: {
                     type: ComponentType.TextInput,
                     style: 1,
                     custom_id: 'entity_id',
-                    placeholder: 'Paste your ID here...',
+                    placeholder: placeholder,
                     required: true,
                     max_length: 100,
                 },
@@ -619,7 +649,7 @@ export function buildAddRewardModal(setupId: string): APIModalInteractionRespons
 
 export function buildCompleteStep(setupId: string, state: TSetupState): RESTPostAPIChannelMessageJSONBody {
     const configSummary = [
-        `**Type:** ${state.entity_type === 'bot' ? 'Bot' : 'Server'}`,
+        `**Type:** ${state.entity_type === 'bot' ? 'Bot' : state.entity_type === 'server' ? 'Server' : 'Game'}`,
         `**Entity ID:** ${state.entity_id}`,
         state.channel_id ? `**Logging Channel:** <#${state.channel_id}>` : '**Logging Channel:** Not set',
         state.external_webhook_url ? `**External Webhook:** Set` : '**External Webhook:** Not set',
@@ -628,7 +658,7 @@ export function buildCompleteStep(setupId: string, state: TSetupState): RESTPost
     ].join('\n');
 
     const entityType = state.entity_type || 'bot';
-    const showDiscordBotList = entityType === 'bot';
+    const showDiscordBotList = entityType === 'bot' || entityType === 'game';
 
     return {
         components: [
@@ -716,8 +746,9 @@ export function buildCompleteStep(setupId: string, state: TSetupState): RESTPost
 }
 
 export function buildPlatformTopGGGuide(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string, hasExistingConnection = false): RESTPostAPIChannelMessageJSONBody {
-    const entityType = state.entity_type === 'bot' ? 'bot' : 'server';
+    const entityType = state.entity_type === 'bot' ? 'bot' : state.entity_type === 'server' ? 'server' : 'roblox/games';
     const entityId = state.entity_id || '';
+    const isGame = state.entity_type === 'game';
 
     const components: any[] = [
         {
@@ -748,9 +779,10 @@ export function buildPlatformTopGGGuide(setupId: string, state: TSetupState, web
             ],
         });
     } else {
+        const integrationsUrl = `https://top.gg/${isGame ? 'roblox/games' : 'discord'}/${entityType}/${entityId}/dashboard/integrations`;
         components.push({
             type: ComponentType.TextDisplay,
-            content: `### 1. Visit the Integrations Page\nNavigate to:\n<https://top.gg/discord/${entityType}/${entityId}/dashboard/integrations>\n`,
+            content: `### 1. Visit the Integrations Page\nNavigate to:\n<${integrationsUrl}>\n`,
         });
         components.push({
             type: ComponentType.Separator,

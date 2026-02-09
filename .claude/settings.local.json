@@ -6,7 +6,8 @@
       "Bash(node:*)",
       "Bash(npm install:*)",
       "Bash(npx tsc:*)",
-      "Bash(./node_modules/.bin/tsc:*)"
+      "Bash(./node_modules/.bin/tsc:*)",
+      "Bash(npx -y typescript@latest tsc:*)"
     ]
   }
 }

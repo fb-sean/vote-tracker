@@ -18,7 +18,7 @@ export type TSetupState = {
     current_step: number;
     server_id: string;
     user_id: string;
-    entity_type: 'bot' | 'server' | null;
+    entity_type: 'bot' | 'server' | 'game' | null;
     entity_id: string | null | '';
     channel_id: string | null;
     external_webhook_url: string | null;
@@ -184,7 +184,7 @@ export async function createEditState(setupId: string, userId: string): Promise<
         current_step: 0,
         server_id: setup.server_id || '',
         user_id: userId,
-        entity_type: setup.entity_type as 'bot' | 'server',
+        entity_type: setup.entity_type as 'bot' | 'server' | 'game',
         entity_id: setup.entity_id || '',
         channel_id: setup.channel_id || null,
         external_webhook_url: setup.external_webhook_url || null,
@@ -228,12 +228,13 @@ export function buildSetupList(setups: any[], serverId: string) {
 
         for (let i = 0; i < setups.length; i++) {
             const setup = setups[i];
+            const entityLabel = setup.entity_type === 'bot' ? `<@${setup.entity_id}>` : setup.entity_type === 'game' ? 'Game' : 'Server';
             components.push({
                 type: ComponentType.Section,
                 components: [
                     {
                         type: ComponentType.TextDisplay,
-                        content: `**${i + 1}. ${setup.entity_type === 'bot' ? `<@${setup.entity_id}>` : 'Server'}** (${setup.entity_id})${setup.channel_id ? `\n📢 Logging: <#${setup.channel_id}>` : ''}${setup.external_webhook_url ? '\n🔗 External webhook' : ''}${setup.rewards.length > 0 ? `\n🎁 ${setup.rewards.length} reward${setup.rewards.length > 1 ? 's' : ''}` : ''}`,
+                        content: `**${i + 1}. ${entityLabel}** (${setup.entity_id})${setup.channel_id ? `\n📢 Logging: <#${setup.channel_id}>` : ''}${setup.external_webhook_url ? '\n🔗 External webhook' : ''}${setup.rewards.length > 0 ? `\n🎁 ${setup.rewards.length} reward${setup.rewards.length > 1 ? 's' : ''}` : ''}`,
                     }
                 ],
                 accessory: {

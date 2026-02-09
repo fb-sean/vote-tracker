@@ -12,7 +12,7 @@ const VoteSchema = new Schema(
         },
         entity_type: {
             type: String,
-            enum: ['bot', 'server'],
+            enum: ['bot', 'server', 'game'],
             required: true,
         },
         entity_id: {

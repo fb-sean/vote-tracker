@@ -17,6 +17,7 @@ import {
     handleSetupEntityIdModal,
     handleSetupFinish,
     handleSetupFirstVoteModal,
+    handleSetupGame,
     handleSetupNext,
     handleSetupPlatformBack,
     handleSetupPlatformDiscordBotList,
@@ -148,6 +149,8 @@ export default class InteractionRoute implements TRoute {
                     return handleSetupBot(ctx, setupId);
                 case 'server':
                     return handleSetupServer(ctx, setupId);
+                case 'game':
+                    return handleSetupGame(ctx, setupId);
                 case 'cancel':
                     return handleSetupCancel(ctx, setupId);
                 case 'back':
