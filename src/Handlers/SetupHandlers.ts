@@ -44,12 +44,29 @@ function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: num
 }
 
 export async function handleSetupBot(ctx: Context, setupId: string) {
-    const state = await updateSetupState(setupId, {entity_type: 'bot', current_step: 1});
+    const userId = ctx.interaction.user?.id || ctx.interaction.member?.user?.id;
+    if (!userId) {
+        return ctx.reply({content: 'Unable to identify user.'});
+    }
+
+    // Check for existing Top.gg connection for this user with bot type
+    const existingConnection = await TopggConnectionModel.findOne({
+        user_id: userId,
+        project_type: 'bot',
+    });
+
+    const entityId = existingConnection?.project_platform_id || null;
+
+    const state = await updateSetupState(setupId, {
+        entity_type: 'bot',
+        entity_id: entityId,
+        current_step: 1,
+    });
     if (!state) {
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
-    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'bot')));
+    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'bot', entityId)));
 }
 
 export async function handleSetupServer(ctx: Context, setupId: string) {
@@ -72,7 +89,7 @@ export async function handleSetupGame(ctx: Context, setupId: string) {
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
-    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'game')));
+    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'game', null)));
 }
 
 export async function handleSetupCancel(ctx: Context, setupId: string) {
@@ -205,6 +222,25 @@ export async function handleSetupEnterEntityId(ctx: Context, setupId: string) {
 
     const entityType = state.entity_type || 'bot';
     return ctx.showModal(buildEntityIdModal(setupId, entityType as 'bot' | 'server' | 'game'));
+}
+
+export async function handleSetupUsePreFetchedId(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    if (!state.entity_id) {
+        return ctx.reply({content: 'No pre-fetched ID found. Please enter an ID manually.'});
+    }
+
+    // Move to the channel and webhook step
+    const updated = await updateSetupState(setupId, {current_step: 2});
+    if (!updated) {
+        return ctx.reply({content: 'Setup session expired. Please start over.'});
+    }
+
+    return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, updated)));
 }
 
 export async function handleSetupChannelSelect(ctx: Context, setupId: string) {
@@ -595,7 +631,7 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
     }
 
     if (step === 1) {
-        return ctx.update(buildPayload(buildEntityIdStep(setupId, (state.entity_type || 'bot') as 'bot' | 'server' | 'game')));
+        return ctx.update(buildPayload(buildEntityIdStep(setupId, (state.entity_type || 'bot') as 'bot' | 'server' | 'game', state.entity_id)));
     }
 
     if (step === 2) {

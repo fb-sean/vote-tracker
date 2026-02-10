@@ -61,7 +61,7 @@ export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMes
     };
 }
 
-export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server' | 'game'): RESTPostAPIChannelMessageJSONBody {
+export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server' | 'game', preFetchedEntityId: string | null = null): RESTPostAPIChannelMessageJSONBody {
     const description = entityType === 'bot'
         ? 'Enter the bot ID you want to track votes for.'
         : entityType === 'server'
@@ -74,60 +74,100 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server' 
             ? '## ⚠️ Important: Use Your Real Discord ID\nPlease enter your **actual Discord server ID**.\n\n**Do NOT** use the ID from the top.gg URL - those are different from your actual Discord IDs!'
             : '## ⚠️ Important: Use Your top.gg Game ID\nPlease enter the **top.gg game ID** from the URL.\n\nExample: For `https://top.gg/roblox/games/796498829106180096`, use `796498829106180096`';
 
-    return {
+    const components: any[] = [
+        {
+            type: ComponentType.TextDisplay,
+            content: `# Setup Vote Tracking - Step 2/6`,
+        },
+        {
+            type: ComponentType.TextDisplay,
+            content: description,
+        },
+    ];
+
+    if (preFetchedEntityId) {
+        components.push({
+            type: ComponentType.Container,
+            accent_color: 5763719,
+            components: [
+                {
+                    type: ComponentType.TextDisplay,
+                    content: `## ✅ Found Existing Connection!\nWe found an existing Top.gg connection for your account.\n\n**${entityType === 'bot' ? 'Bot' : 'Server'} ID:** \`${preFetchedEntityId}\`\n\nYou can use this ID or enter a different one.`,
+                },
+            ],
+        });
+
+        components.push({
+            type: ComponentType.Separator,
+            spacing: 1,
+        });
+
+        components.push({
+            type: ComponentType.ActionRow,
+            components: [
+                {
+                    type: ComponentType.Button,
+                    style: ButtonStyle.Success,
+                    label: 'Use this ID',
+                    custom_id: `setup_use_prefetched_id_${setupId}`,
+                },
+                {
+                    type: ComponentType.Button,
+                    style: ButtonStyle.Primary,
+                    label: 'Enter different ID',
+                    custom_id: `setup_enter_entityid_${setupId}`,
+                },
+            ],
+        });
+    } else {
+        components.push({
+            type: ComponentType.Container,
+            accent_color: 15548997,
+            components: [
+                {
+                    type: ComponentType.TextDisplay,
+                    content: idHint,
+                },
+            ],
+        });
+
+        components.push({
+            type: ComponentType.Separator,
+            spacing: 1,
+        });
+
+        components.push({
+            type: ComponentType.ActionRow,
+            components: [
+                {
+                    type: ComponentType.Button,
+                    style: ButtonStyle.Primary,
+                    label: 'Enter ID',
+                    custom_id: `setup_enter_entityid_${setupId}`,
+                },
+            ],
+        });
+    }
+
+    components.push({
+        type: ComponentType.ActionRow,
         components: [
             {
-                type: ComponentType.TextDisplay,
-                content: `# Setup Vote Tracking - Step 2/6`,
+                type: ComponentType.Button,
+                style: ButtonStyle.Secondary,
+                label: 'Back',
+                custom_id: `setup_back_${setupId}`,
             },
             {
-                type: ComponentType.TextDisplay,
-                content: description,
-            },
-            {
-                type: ComponentType.Container,
-                accent_color: 15548997,
-                components: [
-                    {
-                        type: ComponentType.TextDisplay,
-                        content: idHint,
-                    },
-                ],
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'Enter ID',
-                        custom_id: `setup_enter_entityid_${setupId}`,
-                    },
-                ],
-            },
-            {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Secondary,
-                        label: 'Back',
-                        custom_id: `setup_back_${setupId}`,
-                    },
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Danger,
-                        label: 'Cancel',
-                        custom_id: `setup_cancel_${setupId}`,
-                    },
-                ],
+                type: ComponentType.Button,
+                style: ButtonStyle.Danger,
+                label: 'Cancel',
+                custom_id: `setup_cancel_${setupId}`,
             },
         ],
-    };
+    });
+
+    return {components};
 }
 
 export function buildEntityIdModal(setupId: string, entityType: 'bot' | 'server' | 'game'): APIModalInteractionResponseCallbackData {

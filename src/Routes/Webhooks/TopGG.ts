@@ -82,10 +82,12 @@ export default class WebhookTopGGRoute implements TRoute {
         const settings = await SettingsModel.findOne({
             entity_type: mappedData.entity_type,
             entity_id: mappedData.entity_id,
+            disabled: false
         });
 
         if (!settings) {
             Logger.warn(`No settings found for ${mappedData.entity_type} ${mappedData.entity_id}`, 'TOPGG');
+
             return Response(res, {message: 'Vote received (no settings configured)'});
         }
 

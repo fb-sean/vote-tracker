@@ -82,7 +82,7 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
     }
 
     if (step === 1) {
-        return ctx.update(buildPayload(buildEntityIdStep(setupId, state.entity_type || 'bot')));
+        return ctx.update(buildPayload(buildEntityIdStep(setupId, state.entity_type || 'bot', state.entity_id)));
     }
 
     if (step === 2) {

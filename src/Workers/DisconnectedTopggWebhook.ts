@@ -22,7 +22,7 @@ export default class DisconnectedTopggWebhookWorker implements TWorker {
         let d: any = null;
 
         try {
-            const settings = await SettingsModel.find({entity_id: data.entity_id, entity_type: data.entity_type});
+            const settings = await SettingsModel.find({entity_id: data.entity_id, entity_type: data.entity_type, disabled: false});
             for (const setting of settings) {
                 const channelId = setting.channel_id;
                 if (!channelId) {

@@ -26,6 +26,7 @@ import {
     handleSetupRemoveReward,
     handleSetupServer,
     handleSetupTestChannel,
+    handleSetupUsePreFetchedId,
     handleSetupVoteModal,
     handleSetupWebhookModal,
 } from "@Handlers/SetupHandlers";
@@ -164,6 +165,12 @@ export default class InteractionRoute implements TRoute {
 
                     if (parts[2] === 'webhook') {
                         return handleSetupEnterWebhook(ctx, setupId);
+                    }
+
+                    break;
+                case 'use':
+                    if (parts[2] === 'prefetched' && parts[3] === 'id') {
+                        return handleSetupUsePreFetchedId(ctx, setupId);
                     }
 
                     break;
