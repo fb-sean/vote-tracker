@@ -32,6 +32,7 @@ export type TCommandHandler = (ctx: Context, additional?: Record<string, any>) =
 export type Command = {
     data: Partial<APIApplicationCommand>;
     execute?: TCommandHandler;
+    autocomplete?: (ctx: Context, additional?: Record<string, any>) => Promise<any>;
 };
 
 export type Button = {

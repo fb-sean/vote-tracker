@@ -126,6 +126,39 @@ export default class InteractionRoute implements TRoute {
             });
         }
 
+        if (ctx.isAutoComplete()) {
+            const command = DiscordClient.getInstance().getCommand(ctx.interaction.data.name);
+            if (!command) {
+                return ctx.autocomplete([]);
+            }
+
+            const additional: Record<string, any> = {};
+            const data = ctx.interaction.data;
+
+            if (data && data.options) {
+                for (const option of data.options) {
+                    // @ts-ignore - focused exists on autocomplete options
+                    if (option.focused) {
+                        continue;
+                    }
+
+                    // @ts-ignore
+                    additional[option.name] = option.value;
+                }
+            }
+
+            if (command.autocomplete) {
+                return command.autocomplete(ctx, additional)
+                    .catch(async (e) => {
+                        Logger.error(`Error in autocomplete for ${command.constructor.name}`, 'AUTOCOMPLETE');
+                        console.log(e);
+                        return ctx.autocomplete([]);
+                    });
+            }
+
+            return ctx.autocomplete([]);
+        }
+
         if (ctx.isModal()) {
             const customId = ctx.interaction.data.custom_id;
             const parts = customId.split('_');
