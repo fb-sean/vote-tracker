@@ -1,5 +1,5 @@
 import {TWorker, IWorkerPayloadData, EWorkerJobs} from "@Types/RedisQueue";
-import SettingsModel from "@Schemas/Settings";
+import SettingsModel, {Settings} from "@Schemas/Settings";
 import TemporaryRoleModel from "@Schemas/TemporaryRole";
 import {DiscordClient} from "@API/DiscordClient";
 import {Routes} from "discord-api-types/v10";
@@ -21,7 +21,7 @@ export default class GiveRolesWorker implements TWorker {
         try {
             Logger.info(`Processing roles for ${data.user_id}`, 'GIVE_ROLES');
 
-            const settings = await SettingsModel.findOne({server_id: data.server_id});
+            const settings = data.settings;
             if (!settings) {
                 Logger.warn(`Settings not found for ${data.server_id}`, 'GIVE_ROLES');
 
@@ -69,14 +69,13 @@ export default class GiveRolesWorker implements TWorker {
     }
 
     private async determineRoles(
-        rewards: unknown,
+        rewards: Settings['rewards'],
         payload: IGiveRolesPayload
     ): Promise<Array<{roleId: string; durationMin: number}>> {
         const rolesToGive: Array<{roleId: string; durationMin: number}> = [];
-        const rewardArray = rewards as Array<{role_id?: string | null; min_votes?: number; duration_min?: number}>;
 
-        if (rewardArray && rewardArray.length > 0) {
-            for (const reward of rewardArray) {
+        if (rewards && rewards.length > 0) {
+            for (const reward of rewards) {
                 if (payload.vote_counts.all >= (reward.min_votes || 0)) {
                     if (reward.role_id) {
                         rolesToGive.push({
@@ -100,8 +99,7 @@ export default class GiveRolesWorker implements TWorker {
                 return cached === 'true';
             }
 
-            const bot = DiscordClient.getInstance();
-            await bot.rest.get(Routes.guildMember(guildId, userId));
+            await DiscordClient.getInstance().rest.get(Routes.guildMember(guildId, userId));
 
             await Redis.getInstance().set(cacheKey, 'true', 900);
 

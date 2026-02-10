@@ -22,7 +22,7 @@ export default class SendMessageWorker implements TWorker {
         try {
             Logger.info(`Sending message for ${data.user_id} from ${data.platform}`, 'SEND_MESSAGE');
 
-            const settings = await SettingsModel.findOne({server_id: data.server_id});
+            const settings = data.settings;
             if (!settings) {
                 Logger.warn(`Settings not found for ${data.server_id}`, 'SEND_MESSAGE');
 
@@ -31,12 +31,6 @@ export default class SendMessageWorker implements TWorker {
 
             if (settings.disabled) {
                 Logger.info(`Settings ${data.server_id} is disabled, skipping message`, 'SEND_MESSAGE');
-
-                return;
-            }
-
-            if (!data.user_exists_in_guild) {
-                Logger.info(`User ${data.user_id} not in guild, skipping message`, 'SEND_MESSAGE');
 
                 return;
             }
@@ -81,19 +75,21 @@ export default class SendMessageWorker implements TWorker {
             'user.id': payload.user_id,
             'user.username': payload.user_data?.username || 'Unknown',
             'user.avatar': payload.user_data?.avatar || '',
+            'user.avatar.animated': payload.user_data?.avatar.startsWith('a_') ? '?anmiated=true' : '',
             'votes.count.all': payload.vote_counts.all,
-            'votes.count.month': payload.vote_counts.thisMonth,
-            'votes.count.year': payload.vote_counts.thisYear,
-            'votes.count.week': payload.vote_counts.thisWeek,
+            'votes.count.month': payload.vote_counts.month,
+            'votes.count.year': payload.vote_counts.year,
+            'votes.count.week': payload.vote_counts.week,
             'votes.streak.current': payload.streak.current,
             'votes.streak.best': payload.streak.best,
+            'votes.streak.last': payload.streak.last,
             'platform': payload.platform,
             'entity.type': payload.entity_type,
             'entity.id': payload.entity_id,
         };
 
         try {
-            const parsed = JSON.parse(messageRaw);
+            const parsed = JSON.parse(this.replacePlaceholders(messageRaw, placeholders));
 
             if (Array.isArray(parsed)) {
                 let content = '';

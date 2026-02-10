@@ -1,29 +1,30 @@
+import {Settings} from "@Schemas/Settings";
+
 export interface IComputeVotePayload {
+    type: string;
     user_id: string;
-    server_id: string;
-    entity_type: 'bot' | 'server';
     entity_id: string;
+    entity_type: 'bot' | 'server';
     platform: string;
-    is_test: boolean;
     guild_id?: string;
-    rewards?: {
-        milestone?: number;
-        monthly?: number;
-        streak?: number;
-    };
 }
 
 export interface IVoteCounts {
     all: number;
-    thisMonth: number;
-    thisYear: number;
-    thisWeek: number;
+    month: number;
+    year: number;
+    week: number;
 }
 
 export interface IStreakData {
     current: number;
     best: number;
-    lastVote: number;
+    last: number;
+}
+
+export interface IDisconnectedTopggWebhookPayload {
+    entity_type: 'bot' | 'server';
+    entity_id: string;
 }
 
 export interface ISendMessagePayload {
@@ -35,9 +36,10 @@ export interface ISendMessagePayload {
     is_test: boolean;
     vote_counts: IVoteCounts;
     streak: IStreakData;
+    last_vote: number;
     is_first_vote: boolean;
     user_data: IUserData | null;
-    user_exists_in_guild: boolean;
+    settings: Settings;
 }
 
 export interface IMessagePlaceholders {
@@ -45,15 +47,17 @@ export interface IMessagePlaceholders {
     'user.id': string;
     'user.username': string;
     'user.avatar': string;
+    'user.avatar.animated': string;
     'votes.count.all': number;
     'votes.count.month': number;
     'votes.count.year': number;
     'votes.count.week': number;
     'votes.streak.current': number;
     'votes.streak.best': number;
-    'platform': string;
+    'votes.streak.last': number;
     'entity.type': string;
     'entity.id': string;
+    'platform': string;
 }
 
 export interface IGiveRolesPayload {
@@ -65,19 +69,20 @@ export interface IGiveRolesPayload {
         streak?: number;
     };
     vote_counts: IVoteCounts;
+    settings: Settings;
 }
 
 export interface ISendExternalWebhookPayload {
     user_id: string;
-    server_id: string;
     entity_type: 'bot' | 'server';
     entity_id: string;
+    guild_id?: string;
     platform: string;
     is_test: boolean;
     vote_counts: IVoteCounts;
     streak: IStreakData;
     is_first_vote: boolean;
-    user_data: IUserData | null;
+    settings: Settings;
 }
 
 export interface IUserData {

@@ -26,11 +26,7 @@ const VoteSchema = new Schema(
         is_test: {
             type: Boolean,
             default: false,
-        },
-        guild_id: {
-            type: String,
-            default: null,
-        },
+        }
     },
     {
         versionKey: false,

@@ -37,12 +37,13 @@ export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMes
                         label: 'Server',
                         custom_id: `setup_server_${setupId}`,
                     },
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'Game',
-                        custom_id: `setup_game_${setupId}`,
-                    },
+                    // Later
+                    // {
+                    //     type: ComponentType.Button,
+                    //     style: ButtonStyle.Primary,
+                    //     label: 'Game',
+                    //     custom_id: `setup_game_${setupId}`,
+                    // },
                 ],
             },
             {
@@ -221,7 +222,7 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
                 components: [
                     {
                         type: ComponentType.TextDisplay,
-                        content: `📢 ${channelText}`,
+                        content: `${channelText}`,
                     },
                     {
                         type: ComponentType.ActionRow,
@@ -233,6 +234,22 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
                             },
                         ],
                     },
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: `${webhookText}`,
+                    },
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Success,
+                                label: 'Set External Webhook',
+                                custom_id: `setup_enter_webhook_${setupId}`,
+                                disabled: !!state.external_webhook_url,
+                            },
+                        ],
+                    }
                 ],
             },
             {
@@ -242,13 +259,6 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
             {
                 type: ComponentType.ActionRow,
                 components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Success,
-                        label: 'Set External Webhook',
-                        custom_id: `setup_enter_webhook_${setupId}`,
-                        disabled: !!state.external_webhook_url,
-                    },
                     {
                         type: ComponentType.Button,
                         style: ButtonStyle.Secondary,
@@ -276,9 +286,9 @@ export function buildExternalWebhookModal(setupId: string): APIModalInteractionR
                 content: '**Webhook Payload Information**\n' +
                     'Your webhook will receive POST requests with vote data. All fields listed below are sent in the request body as JSON.\n' +
                     '**Required Fields**\n' +
-                    '• entity_type: "bot" or "server"\n• entity_id: Your bot/server ID\n• voterId: ID of the user who voted\n• platform: Where the vote came from (top.gg, etc.)\n' +
+                    '• entity_type: "bot" or "server"\n• entity_id: Your bot/server ID\n• voter_id: ID of the user who voted\n• platform: Where the vote came from (top.gg, etc.)\n' +
                     '**Optional Fields**\n' +
-                    '• guildId: Server ID (when available)\n• count: {all, thisMonth, thisYear, thisWeek}\n• streak: {best, current, lastVote}\n\nAll optional fields may not always be present!',
+                    '• guild_id: Server ID (when available)\n• is_test: If its a test event\n• last_vote: UNIX timestamp\n• is_first_vote: If the user voted for the first time\n• count: {all, month, year, week}\n• streak: {best, current, last}\n\nAll optional fields may not always be present!',
             },
             {
                 type: ComponentType.Label,
@@ -349,16 +359,17 @@ export function buildMessagesStep(setupId: string, state: TSetupState): RESTPost
                 content: '>>> 💡 Messages use Discord markdown.\n' +
                     'Available variables:\n' +
                     '- {user.mention} - <@813913649633951764>\n' +
-                    '- {user.displayName} - Votes\n' +
+                    '- {user.username} - Votes\n' +
                     '- {user.id} - 813913649633951764\n' +
-                    '- {user.avatarUrl} - <https://cdn.discordapp.com/avatars/813913649633951764/0b58922d67bb06a5924898361a6ff0ff.webp>\n' +
+                    '- {user.avatar} - 0b58922d67bb06a5924898361a6ff0ff\n' +
+                    '- {user.avatar.animated} - ?animated=true\n' +
                     '- {votes.count.all} - 1000\n' +
-                    '- {votes.count.thisMonth} - 500\n' +
-                    '- {votes.count.thisYear} - 1000\n' +
-                    '- {votes.count.thisWeek} - 50\n' +
+                    '- {votes.count.month} - 500\n' +
+                    '- {votes.count.year} - 1000\n' +
+                    '- {votes.count.week} - 50\n' +
                     '- {votes.streak.current} - 12\n' +
                     '- {votes.streak.best} - 357\n' +
-                    '- {votes.lastVote} - 1770667266 (UNIX timestamp)\n' +
+                    '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
                     '- {entity.type} - "bot" or "server"\n' +
                     '- {entity.id} - 813913649633951764\n' +
                     '- {platform} - top.gg, etc.\n'
@@ -438,7 +449,22 @@ export function buildFirstVoteMessageModal(setupId: string, currentValue: string
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '**Available Variables:**\n• {user.mention} - User mention\n• {user.displayName} - Display name\n• {user.id} - User ID\n• {user.avatarUrl} - Avatar URL\n• {votes.count.all} - Total votes\n• {votes.count.thisMonth} - This month\n• {votes.count.thisYear} - This year\n• {votes.count.thisWeek} - This week\n• {votes.streak.current} - Current streak\n• {votes.streak.best} - Best streak\n• {votes.lastVote} - Last vote timestamp\n• {entity.type} - Entity type\n• {entity.id} - Entity ID\n• {platform} - Platform name',
+                content: '**Available variables**\n' +
+                    '- {user.mention} - <@813913649633951764>\n' +
+                    '- {user.username} - Votes\n' +
+                    '- {user.id} - 813913649633951764\n' +
+                    '- {user.avatar} - 0b58922d67bb06a5924898361a6ff0ff\n' +
+                    '- {user.avatar.animated} - ?animated=true\n' +
+                    '- {votes.count.all} - 1000\n' +
+                    '- {votes.count.month} - 500\n' +
+                    '- {votes.count.year} - 1000\n' +
+                    '- {votes.count.week} - 50\n' +
+                    '- {votes.streak.current} - 12\n' +
+                    '- {votes.streak.best} - 357\n' +
+                    '- {votes.last} - 1770667266 (UNIX timestamp)\n' +
+                    '- {entity.type} - "bot" or "server"\n' +
+                    '- {entity.id} - 813913649633951764\n' +
+                    '- {platform} - top.gg, etc.\n',
             },
             {
                 type: ComponentType.TextDisplay,
@@ -473,7 +499,22 @@ export function buildVoteMessageModal(setupId: string, currentValue: string): AP
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '**Available Variables:**\n• {user.mention} - User mention\n• {user.displayName} - Display name\n• {user.id} - User ID\n• {user.avatarUrl} - Avatar URL\n• {votes.count.all} - Total votes\n• {votes.count.thisMonth} - This month\n• {votes.count.thisYear} - This year\n• {votes.count.thisWeek} - This week\n• {votes.streak.current} - Current streak\n• {votes.streak.best} - Best streak\n• {votes.lastVote} - Last vote timestamp\n• {entity.type} - Entity type\n• {entity.id} - Entity ID\n• {platform} - Platform name',
+                content: '**Available variables**\n' +
+                    '- {user.mention} - <@813913649633951764>\n' +
+                    '- {user.username} - Votes\n' +
+                    '- {user.id} - 813913649633951764\n' +
+                    '- {user.avatar} - 0b58922d67bb06a5924898361a6ff0ff\n' +
+                    '- {user.avatar.animated} - ?animated=true\n' +
+                    '- {votes.count.all} - 1000\n' +
+                    '- {votes.count.month} - 500\n' +
+                    '- {votes.count.year} - 1000\n' +
+                    '- {votes.count.week} - 50\n' +
+                    '- {votes.streak.current} - 12\n' +
+                    '- {votes.streak.best} - 357\n' +
+                    '- {votes.last} - 1770667266 (UNIX timestamp)\n' +
+                    '- {entity.type} - "bot" or "server"\n' +
+                    '- {entity.id} - 813913649633951764\n' +
+                    '- {platform} - top.gg, etc.\n',
             },
             {
                 type: ComponentType.TextDisplay,

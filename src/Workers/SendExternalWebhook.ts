@@ -18,21 +18,21 @@ export default class SendExternalWebhookWorker implements TWorker {
         try {
             Logger.info(`Sending external webhook for ${data.user_id} from ${data.platform}`, 'EXTERNAL_WEBHOOK');
 
-            const settings = await SettingsModel.findOne({server_id: data.server_id});
+            const settings = data.settings;
             if (!settings) {
-                Logger.warn(`Settings not found for ${data.server_id}`, 'EXTERNAL_WEBHOOK');
+                Logger.warn(`Settings not found for ${data.entity_id}`, 'EXTERNAL_WEBHOOK');
 
                 return;
             }
 
             if (settings.disabled) {
-                Logger.info(`Settings ${data.server_id} is disabled, skipping webhook`, 'EXTERNAL_WEBHOOK');
+                Logger.info(`Settings ${settings.server_id} is disabled, skipping webhook`, 'EXTERNAL_WEBHOOK');
 
                 return;
             }
 
             if (!settings.external_webhook_url) {
-                Logger.info(`No external webhook configured for ${data.server_id}`, 'EXTERNAL_WEBHOOK');
+                Logger.info(`No external webhook configured for ${settings.server_id}`, 'EXTERNAL_WEBHOOK');
 
                 return;
             }
@@ -53,36 +53,25 @@ export default class SendExternalWebhookWorker implements TWorker {
         const basePayload: Record<string, unknown> = {
             entity_type: payload.entity_type,
             entity_id: payload.entity_id,
-            voterId: payload.user_id,
+            voter_id: payload.user_id,
             platform: payload.platform,
-            isTest: payload.is_test,
+            guild_id: payload.guild_id,
+            is_test: payload.is_test,
+            is_first_vote: payload.is_first_vote,
         };
-
-        if (payload.server_id) {
-            basePayload.guildId = payload.server_id;
-        }
 
         basePayload.count = {
             all: payload.vote_counts.all,
-            month: payload.vote_counts.thisMonth,
-            year: payload.vote_counts.thisYear,
-            week: payload.vote_counts.thisWeek,
+            month: payload.vote_counts.month,
+            year: payload.vote_counts.year,
+            week: payload.vote_counts.week,
         };
 
         basePayload.streak = {
             current: payload.streak.current,
             best: payload.streak.best,
-            lastVote: payload.streak.lastVote,
+            last: payload.streak.last,
         };
-
-        if (payload.user_data) {
-            basePayload.user = {
-                username: payload.user_data.username,
-                avatar: payload.user_data.avatar,
-            };
-        }
-
-        basePayload.isFirstVote = payload.is_first_vote;
 
         return basePayload;
     }

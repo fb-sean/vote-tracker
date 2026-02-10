@@ -7,7 +7,7 @@ import {Routes} from "discord-api-types/v10";
 import Redis from "@API/RedisCache";
 import RedisQueue from "@API/RedisQueue";
 import Logger from "@Utils/Logger";
-import type {IComputeVotePayload, IVoteCounts, IStreakData, IUserData} from "@Types/Workers";
+import type {IComputeVotePayload, IVoteCounts, IStreakData, IUserData, ISendMessagePayload} from "@Types/Workers";
 
 export default class ComputeVoteWorker implements TWorker {
     jobName = EWorkerJobs.ComputeVote;
@@ -21,88 +21,84 @@ export default class ComputeVoteWorker implements TWorker {
         try {
             Logger.info(`Processing vote for ${data.user_id} from ${data.platform}`, 'COMPUTE_VOTE');
 
-            await VoteModel.create({
-                user_id: data.user_id,
-                server_id: data.server_id,
-                entity_type: data.entity_type,
-                entity_id: data.entity_id,
-                platform: data.platform,
-                is_test: data.is_test,
-                guild_id: data.guild_id || null,
-            });
+            const settings = await SettingsModel.find({entity_id: data.entity_id, entity_type: data.entity_type});
+            for (const setting of settings) {
+                if (setting.disabled) {
+                    Logger.info(`Settings not found or disabled for ${setting.server_id}, skipping post-processing`, 'COMPUTE_VOTE');
 
-            const settings = await SettingsModel.findOne({server_id: data.server_id});
+                    return;
+                }
 
-            if (!settings || settings.disabled) {
-                Logger.info(`Settings not found or disabled for ${data.server_id}, skipping post-processing`, 'COMPUTE_VOTE');
+                await VoteModel.create({
+                    user_id: data.user_id,
+                    server_id: setting.server_id,
+                    entity_type: data.entity_type,
+                    entity_id: data.entity_id,
+                    platform: data.platform,
+                    is_test: data.type === 'test',
+                });
 
-                return;
-            }
+                const [voteCounts, streakData, isFirstVote] = await Promise.all([
+                    this.getVoteCounts(data),
+                    this.getStreakData(data),
+                    this.checkIsFirstVote(data),
+                ]);
 
-            const [voteCounts, streakData, isFirstVote] = await Promise.all([
-                this.getVoteCounts(data),
-                this.getStreakData(data),
-                this.checkIsFirstVote(data),
-            ]);
+                const userData = await this.getOrFetchUserData(data);
+                const userExistsInGuild = await this.checkUserInGuild(setting.server_id!, data.user_id);
 
-            const userData = await this.getOrFetchUserData(data);
+                const jobs: Promise<unknown>[] = [];
 
-            const userExistsInGuild = data.guild_id
-                ? await this.checkUserInGuild(data.guild_id, data.user_id)
-                : true;
+                if (setting.channel_id) {
+                    jobs.push(
+                        RedisQueue.getInstance().addJob(EWorkerJobs.SendMessage, {
+                            user_id: data.user_id,
+                            entity_type: data.entity_type,
+                            entity_id: data.entity_id,
+                            platform: data.platform,
+                            is_test: data.type === 'test',
+                            vote_counts: voteCounts,
+                            streak: streakData,
+                            is_first_vote: isFirstVote,
+                            user_data: userData,
+                            settings: setting
+                        })
+                    );
+                }
 
-            const jobs: Promise<unknown>[] = [];
+                if (setting.rewards && setting.rewards.length > 0 && userExistsInGuild) {
+                    jobs.push(
+                        RedisQueue.getInstance().addJob(EWorkerJobs.GiveRoles, {
+                            user_id: data.user_id,
+                            rewards: setting.rewards,
+                            vote_counts: voteCounts,
+                            settings: setting
+                        })
+                    );
+                }
 
-            if (settings.channel_id) {
-                jobs.push(
-                    RedisQueue.getInstance().addJob(EWorkerJobs.SendMessage, {
-                        user_id: data.user_id,
-                        server_id: data.server_id,
-                        entity_type: data.entity_type,
-                        entity_id: data.entity_id,
-                        platform: data.platform,
-                        is_test: data.is_test,
-                        vote_counts: voteCounts,
-                        streak: streakData,
-                        is_first_vote: isFirstVote,
-                        user_data: userData,
-                        user_exists_in_guild: userExistsInGuild,
-                    })
-                );
-            }
+                if (setting.external_webhook_url) {
+                    jobs.push(
+                        RedisQueue.getInstance().addJob(EWorkerJobs.SendExternalWebhook, {
+                            user_id: data.user_id,
+                            entity_type: data.entity_type,
+                            entity_id: data.entity_id,
+                            guild_id: data.guild_id,
+                            platform: data.platform,
+                            is_test: data.type === 'test',
+                            vote_counts: voteCounts,
+                            streak: streakData,
+                            is_first_vote: isFirstVote,
+                            settings: setting
+                        })
+                    );
+                }
 
-            if (settings.rewards && settings.rewards.length > 0) {
-                jobs.push(
-                    RedisQueue.getInstance().addJob(EWorkerJobs.GiveRoles, {
-                        user_id: data.user_id,
-                        server_id: data.server_id,
-                        rewards: data.rewards,
-                        vote_counts: voteCounts,
-                    })
-                );
-            }
-
-            if (settings.external_webhook_url) {
-                jobs.push(
-                    RedisQueue.getInstance().addJob(EWorkerJobs.SendExternalWebhook, {
-                        user_id: data.user_id,
-                        server_id: data.server_id,
-                        entity_type: data.entity_type,
-                        entity_id: data.entity_id,
-                        platform: data.platform,
-                        is_test: data.is_test,
-                        vote_counts: voteCounts,
-                        streak: streakData,
-                        is_first_vote: isFirstVote,
-                        user_data: userData,
-                    })
-                );
-            }
-
-            if (jobs.length > 0) {
-                await Promise.allSettled(jobs);
-            } else {
-                Logger.info(`No post-processing jobs to queue for ${data.server_id}`, 'COMPUTE_VOTE');
+                if (jobs.length > 0) {
+                    await Promise.allSettled(jobs);
+                } else {
+                    Logger.info(`No post-processing jobs to queue for ${setting.server_id}`, 'COMPUTE_VOTE');
+                }
             }
 
             const duration = Date.now() - startTime;
@@ -121,39 +117,44 @@ export default class ComputeVoteWorker implements TWorker {
         const startOfWeek = new Date(now);
         startOfWeek.setDate(now.getDate() - now.getDay());
 
-        const [all, thisMonth, thisYear, thisWeek] = await Promise.all([
+        const [all, month, year, week] = await Promise.all([
             VoteModel.countDocuments({
                 user_id: payload.user_id,
-                server_id: payload.server_id,
+                entity_id: payload.entity_id,
+                entity_type: payload.entity_type,
                 is_test: false,
             }),
             VoteModel.countDocuments({
                 user_id: payload.user_id,
-                server_id: payload.server_id,
+                entity_id: payload.entity_id,
+                entity_type: payload.entity_type,
                 is_test: false,
                 createdAt: {$gte: startOfMonth},
             }),
             VoteModel.countDocuments({
                 user_id: payload.user_id,
-                server_id: payload.server_id,
+                entity_id: payload.entity_id,
+                entity_type: payload.entity_type,
                 is_test: false,
                 createdAt: {$gte: startOfYear},
             }),
             VoteModel.countDocuments({
                 user_id: payload.user_id,
-                server_id: payload.server_id,
+                entity_id: payload.entity_id,
+                entity_type: payload.entity_type,
                 is_test: false,
                 createdAt: {$gte: startOfWeek},
             }),
         ]);
 
-        return {all, thisMonth, thisYear, thisWeek};
+        return {all, month, year, week};
     }
 
     private async getStreakData(payload: IComputeVotePayload): Promise<IStreakData> {
         const userVotes = await VoteModel.find({
             user_id: payload.user_id,
-            server_id: payload.server_id,
+            entity_id: payload.entity_id,
+            entity_type: payload.entity_type,
             is_test: false,
         }).sort({createdAt: 1}).limit(1);
 
@@ -161,7 +162,7 @@ export default class ComputeVoteWorker implements TWorker {
             return {
                 current: 1,
                 best: 1,
-                lastVote: Date.now(),
+                last: Date.now(),
             };
         }
 
@@ -169,17 +170,29 @@ export default class ComputeVoteWorker implements TWorker {
         const streakGroups = await this.getStreakGroups(payload);
         const best = streakGroups.length > 0 ? Math.max(...streakGroups) : 1;
 
+        const last = await VoteModel
+            .findOne({
+                user_id: payload.user_id,
+                entity_id: payload.entity_id,
+                entity_type: payload.entity_type,
+                is_test: false,
+            })
+            .sort({createdAt: -1})
+            .skip(1)
+            .limit(1);
+
         return {
             current,
             best,
-            lastVote: Date.now(),
+            last: last ? ~~((new Date(last.createdAt)).getTime() / 1000) : Date.now(),
         };
     }
 
     private async calculateCurrentStreak(payload: IComputeVotePayload): Promise<number> {
         const votes = await VoteModel.find({
             user_id: payload.user_id,
-            server_id: payload.server_id,
+            entity_id: payload.entity_id,
+            entity_type: payload.entity_type,
             is_test: false,
         }).sort({createdAt: -1}).limit(1);
 
@@ -207,7 +220,8 @@ export default class ComputeVoteWorker implements TWorker {
 
             const voteInDay = await VoteModel.findOne({
                 user_id: payload.user_id,
-                server_id: payload.server_id,
+                entity_id: payload.entity_id,
+                entity_type: payload.entity_type,
                 is_test: false,
                 createdAt: {$gte: dayStart, $lte: dayEnd},
             });
@@ -226,7 +240,8 @@ export default class ComputeVoteWorker implements TWorker {
     private async getStreakGroups(payload: IComputeVotePayload): Promise<number[]> {
         const votes = await VoteModel.find({
             user_id: payload.user_id,
-            server_id: payload.server_id,
+            entity_id: payload.entity_id,
+            entity_type: payload.entity_type,
             is_test: false,
         }).sort({createdAt: 1});
 
@@ -246,8 +261,8 @@ export default class ComputeVoteWorker implements TWorker {
                 continue;
             }
 
-            const lastVoteTime = currentGroup[currentGroup.length - 1];
-            if (voteTime - lastVoteTime <= oneDay * 2) {
+            const lastTime = currentGroup[currentGroup.length - 1];
+            if (voteTime - lastTime <= oneDay * 2) {
                 currentGroup.push(voteTime);
             } else {
                 groups.push(currentGroup);
@@ -265,11 +280,27 @@ export default class ComputeVoteWorker implements TWorker {
     private async checkIsFirstVote(payload: IComputeVotePayload): Promise<boolean> {
         const existingVote = await VoteModel.findOne({
             user_id: payload.user_id,
-            server_id: payload.server_id,
+            entity_id: payload.entity_id,
+            entity_type: payload.entity_type,
             is_test: false,
         });
 
         return !existingVote;
+    }
+
+    private async getlast(payload: IComputeVotePayload): Promise<any> {
+        const last = await VoteModel
+            .findOne({
+                user_id: payload.user_id,
+                entity_id: payload.entity_id,
+                entity_type: payload.entity_type,
+                is_test: false,
+            })
+            .sort({createdAt: -1})
+            .skip(1)
+            .limit(1);
+
+        return last;
     }
 
     private async getOrFetchUserData(payload: IComputeVotePayload): Promise<IUserData | null> {
