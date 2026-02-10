@@ -30,7 +30,7 @@ import {
     handleSetupVoteModal,
     handleSetupWebhookModal,
 } from "@Handlers/SetupHandlers";
-import {handleListDelete, handleListDeleteCancel, handleListDeleteConfirm, handleListEdit, handleListDump,} from "@Handlers/ListHandlers";
+import {handleListDelete, handleListDeleteCancel, handleListDeleteConfirm, handleListEdit, handleListDump, handleListToggleDisable, handleListToggleEnable,} from "@Handlers/ListHandlers";
 import {createSetupState, getAllSetupsForServer, buildSetupList} from "@Utils/SetupManager";
 import {buildEntitySelectionStep} from "@Utils/SetupComponents";
 
@@ -307,6 +307,16 @@ export default class InteractionRoute implements TRoute {
                         return handleListDeleteCancel(ctx, parts[3]);
                     }
                     return handleListDelete(ctx, parts[2]);
+                case 'toggle':
+                    // list_toggle_enable_{setupId} -> parts: ['list', 'toggle', 'enable', setupId]
+                    // list_toggle_disable_{setupId} -> parts: ['list', 'toggle', 'disable', setupId]
+                    if (parts[2] === 'enable') {
+                        return handleListToggleEnable(ctx, parts[3]);
+                    }
+                    if (parts[2] === 'disable') {
+                        return handleListToggleDisable(ctx, parts[3]);
+                    }
+                    break;
                 default:
                     return ctx.reply({content: 'Unknown list action.'});
             }

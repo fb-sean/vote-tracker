@@ -2,6 +2,7 @@ import {randomBytes} from "crypto";
 import {ButtonStyle, ComponentType} from "discord-api-types/v10";
 import Redis from "@API/RedisCache";
 import SettingsModel from "@Schemas/Settings";
+import TopggConnectionModel from "@Schemas/Integrations/Topgg";
 
 export type TRewardRole = {
     role_id: string;
@@ -26,6 +27,7 @@ export type TSetupState = {
     rewards: TRewardRole[];
     auth_token: string | null;
     editing_id: string | null;
+    disable?: boolean;
 };
 
 const SETUP_STEPS = [
@@ -81,15 +83,6 @@ export async function deleteSetupState(setupId: string): Promise<void> {
     await Redis.getInstance().delete(`discord:vt:setup:${setupId}`);
 }
 
-export async function getCurrentStep(setupId: string): Promise<TSetupStep | null> {
-    const state = await getSetupState(setupId);
-    if (!state) {
-        return null;
-    }
-
-    return SETUP_STEPS[state.current_step] || null;
-}
-
 export async function nextStep(setupId: string): Promise<TSetupState | null> {
     const state = await getSetupState(setupId);
     if (!state || state.current_step >= SETUP_STEPS.length - 1) {
@@ -112,16 +105,43 @@ export async function countSetupsForServer(serverId: string): Promise<number> {
     return SettingsModel.countDocuments({server_id: serverId});
 }
 
-export async function saveSetupToDatabase(setupId: string): Promise<boolean> {
+export async function checkForDuplicateEntityId(entityId: string, excludeId?: string): Promise<boolean> {
+    const query: any = {
+        entity_id: entityId,
+        disabled: false,
+    };
+
+    if (excludeId) {
+        query._id = {$ne: excludeId};
+    }
+
+    const existing = await SettingsModel.findOne(query);
+    return !!existing;
+}
+
+export async function saveSetupToDatabase(setupId: string): Promise<{ success: boolean, error?: string }> {
     const state = await getSetupState(setupId);
     if (!state || !state.entity_type || !state.entity_id) {
-        return false;
+        return {success: false};
     }
 
     if (state.editing_id) {
         const existing = await SettingsModel.findById(state.editing_id);
         if (!existing) {
-            return false;
+            return {success: false};
+        }
+
+        const wasDisabled = existing.disabled;
+        const willBeEnabled = !state.disable;
+
+        if ((wasDisabled && !willBeEnabled) || existing.entity_id !== state.entity_id) {
+            const hasDuplicate = await checkForDuplicateEntityId(state.entity_id, state.editing_id);
+            if (hasDuplicate) {
+                return {
+                    success: false,
+                    error: `This entity ID (\`${state.entity_id}\`) is already in use by another active setup. If you want to use it for this entity:\n\n1. Delete the integration in the Top.gg settings\n2. Enable this setup again\n3. Or contact support for assistance`,
+                };
+            }
         }
 
         existing.entity_id = state.entity_id;
@@ -130,13 +150,32 @@ export async function saveSetupToDatabase(setupId: string): Promise<boolean> {
         existing.external_webhook_url = state.external_webhook_url;
         existing.set('rewards', state.rewards);
         existing.set('messages', state.messages);
+        existing.disabled = state.disable || false;
 
         await existing.save();
         await deleteSetupState(setupId);
 
-        return true;
+        return {success: true};
     } else {
-        // Default messages
+        const hasDuplicate = await checkForDuplicateEntityId(state.entity_id);
+        if (hasDuplicate) {
+            return {
+                success: false,
+                error: `This entity ID (\`${state.entity_id}\`) is already in use by another active setup. If you want to use it for this entity:\n\n1. Delete the integration in the Top.gg settings\n2. Try creating this setup again\n3. Or contact support for assistance`,
+            };
+        }
+
+        const hasConnection = await TopggConnectionModel.findOne({
+            project_platform_id: state.entity_id,
+            project_type: state.entity_type
+        });
+        if (hasConnection && hasConnection.user_id !== state.user_id) {
+            return {
+                success: false,
+                error: `This entity ID (\`${state.entity_id}\`) is already connected to another Discord account. If you want to use it for this entity:\n\n1. Delete the integration in the Top.gg settings\n2. Try creating this setup again\n3. Or contact support for assistance`,
+            };
+        }
+
         state.messages = [
             {type: 'first-vote', payload: '{user.mention} has voted for the first time! 🎉'},
             {type: 'vote', payload: '{user.mention} has voted! Total votes: {votes.count.all}'},
@@ -144,12 +183,12 @@ export async function saveSetupToDatabase(setupId: string): Promise<boolean> {
     }
 
     if (!state.auth_token) {
-        return false;
+        return {success: false};
     }
 
     const existingCount = await countSetupsForServer(state.server_id);
     if (existingCount >= 25) {
-        return false;
+        return {success: false};
     }
 
     await SettingsModel.create({
@@ -161,11 +200,12 @@ export async function saveSetupToDatabase(setupId: string): Promise<boolean> {
         external_webhook_url: state.external_webhook_url,
         rewards: state.rewards,
         messages: state.messages,
+        disabled: state.disable || false,
     });
 
     await deleteSetupState(setupId);
 
-    return true;
+    return {success: true};
 }
 
 export async function getAllSetupsForServer(serverId: string) {
@@ -196,6 +236,7 @@ export async function createEditState(setupId: string, userId: string): Promise<
         })) as TRewardRole[],
         auth_token: setup.auth_token || null,
         editing_id: setupId,
+        disable: setup.disabled || false,
     };
 
     await Redis.getInstance().set(`discord:vt:setup:${sessionId}`, editState, 60 * 30);
@@ -217,9 +258,12 @@ export function buildSetupList(setups: any[], serverId: string) {
             content: 'No setups found. Use `/setup` to create one!',
         });
     } else {
+        const enabledSetups = setups.filter((s) => !s.disabled);
+        const disabledSetups = setups.filter((s) => s.disabled);
+
         components.push({
             type: ComponentType.TextDisplay,
-            content: `You have ${setups.length} setup${setups.length > 1 ? 's' : ''} configured.`,
+            content: `You have ${enabledSetups.length} setup${enabledSetups.length !== 1 ? 's' : ''} configured${disabledSetups.length > 0 ? ` (${disabledSetups.length} disabled)` : ''}.`,
         });
         components.push({
             type: ComponentType.Separator,
@@ -228,19 +272,22 @@ export function buildSetupList(setups: any[], serverId: string) {
 
         for (let i = 0; i < setups.length; i++) {
             const setup = setups[i];
+            const isDisabled = setup.disabled;
             const entityLabel = setup.entity_type === 'bot' ? `<@${setup.entity_id}>` : setup.entity_type === 'game' ? 'Game' : 'Server';
+            const statusBadge = isDisabled ? ' 🔴 **Disabled**' : '';
+
             components.push({
                 type: ComponentType.Section,
                 components: [
                     {
                         type: ComponentType.TextDisplay,
-                        content: `**${i + 1}. ${entityLabel}** (${setup.entity_id})${setup.channel_id ? `\n📢 Logging: <#${setup.channel_id}>` : ''}${setup.external_webhook_url ? '\n🔗 External webhook' : ''}${setup.rewards.length > 0 ? `\n🎁 ${setup.rewards.length} reward${setup.rewards.length > 1 ? 's' : ''}` : ''}`,
+                        content: `**${i + 1}. ${entityLabel}** (${setup.entity_id})${statusBadge}${setup.channel_id ? `\n📢 Logging: <#${setup.channel_id}>` : ''}${setup.external_webhook_url ? '\n🔗 External webhook' : ''}${setup.rewards.length > 0 ? `\n🎁 ${setup.rewards.length} reward${setup.rewards.length > 1 ? 's' : ''}` : ''}`,
                     }
                 ],
                 accessory: {
                     type: ComponentType.Button,
-                    style: ButtonStyle.Secondary,
-                    label: 'Edit',
+                    style: isDisabled ? ButtonStyle.Success : ButtonStyle.Secondary,
+                    label: isDisabled ? 'Enable' : 'Edit',
                     custom_id: `list_edit_${setup._id}_${serverId}`,
                 },
             });

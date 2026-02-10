@@ -363,24 +363,33 @@ export async function handleSetupRemoveReward(ctx: Context, setupId: string, rew
 export async function handleSetupFinish(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     if (state.editing_id) {
-        const success = await saveSetupToDatabase(setupId);
-        if (!success) {
-            return ctx.reply({content: '❌ Failed to update setup. Please try again.'});
+        const result = await saveSetupToDatabase(setupId);
+        if (!result.success) {
+            if (result.error) {
+                return ctx.reply({content: `❌ ${result.error}`, flags: MessageFlags.Ephemeral});
+            }
+
+            return ctx.reply({content: '❌ Failed to update setup. Please try again.', flags: MessageFlags.Ephemeral});
         }
+
+        const wasDisabled = state.disable;
+        const isEnabledNow = !wasDisabled;
 
         return ctx.update(buildPayload({
             components: [
                 {
                     type: ComponentType.TextDisplay,
-                    content: '# ✅ Changes Saved!',
+                    content: isEnabledNow ? '# ✅ Setup Enabled!' : '# ✅ Changes Saved!',
                 },
                 {
                     type: ComponentType.TextDisplay,
-                    content: 'Your vote tracking setup has been updated successfully!',
+                    content: isEnabledNow
+                        ? 'Your vote tracking setup has been enabled successfully and is now active!'
+                        : 'Your vote tracking setup has been updated successfully!',
                 },
             ],
         }));
@@ -391,9 +400,13 @@ export async function handleSetupFinish(ctx: Context, setupId: string) {
         return ctx.reply({content: '❌ Maximum of 25 setups per server reached. Please delete an existing setup first.'});
     }
 
-    const success = await saveSetupToDatabase(setupId);
-    if (!success) {
-        return ctx.reply({content: '❌ Failed to save setup. Please try again.'});
+    const result = await saveSetupToDatabase(setupId);
+    if (!result.success) {
+        if (result.error) {
+            return ctx.reply({content: `❌ ${result.error}`, flags: MessageFlags.Ephemeral});
+        }
+
+        return ctx.reply({content: '❌ Failed to save setup. Please try again.', flags: MessageFlags.Ephemeral});
     }
 
     return ctx.update(buildPayload({
@@ -688,7 +701,7 @@ export async function handleSetupPlatformDiscordsCom(ctx: Context, setupId: stri
         return ctx.reply({content: 'Setup session expired. Please start over.'});
     }
 
-    const webhookUrl = `https://votes.discordbots.xyz/webhooks/dbl/${state.auth_token}`;
+    const webhookUrl = `https://votes.discordbots.xyz/webhooks/ds/${state.auth_token}`;
     const maskedToken = state.auth_token ? state.auth_token : '...';
 
     return ctx.update(buildPayload(buildPlatformDiscordsComGuide(setupId, state, webhookUrl, maskedToken)));
