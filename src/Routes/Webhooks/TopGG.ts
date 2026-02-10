@@ -69,12 +69,22 @@ export default class WebhookTopGGRoute implements TRoute {
         const type = req.body.type;
         const data = req.body.data;
 
+        let parsedQuery: Record<string, string> = {};
+        if (data.query) {
+            try {
+                parsedQuery = Object.fromEntries(new URLSearchParams(data.query));
+            } catch (error) {
+                Logger.error(`Failed to parse query parameters: ${error}`, 'TOPGG');
+            }
+        }
+
         const mappedData = {
             type: type === 'webhook.test' ? 'test' : 'vote',
             user_id: data.user.platform_id,
             entity_id: data.project.platform_id,
             entity_type: data.project.type,
             platform: 'topgg',
+            guild_id: parsedQuery?.guild_id || parsedQuery?.guildId || parsedQuery?.metadata,
         };
 
         Logger.info(`Received ${mappedData.type} from ${mappedData.user_id} for ${mappedData.entity_type} ${mappedData.entity_id}`, 'TOPGG');
@@ -93,15 +103,7 @@ export default class WebhookTopGGRoute implements TRoute {
 
         await this.fetchAndSaveUserData(mappedData.user_id);
 
-        await RedisQueue.getInstance().addJob(EWorkerJobs.ComputeVote, {
-            user_id: mappedData.user_id,
-            server_id: settings.server_id,
-            entity_type: mappedData.entity_type,
-            entity_id: mappedData.entity_id,
-            platform: mappedData.platform,
-            is_test: mappedData.type === 'test',
-            guild_id: settings.server_id,
-        });
+        await RedisQueue.getInstance().addJob(EWorkerJobs.ComputeVote, mappedData);
 
         Logger.info(`Vote queued for processing`, 'TOPGG');
         return Response(res, {message: 'Vote received'});
@@ -117,7 +119,11 @@ export default class WebhookTopGGRoute implements TRoute {
             }
 
             const bot = DiscordClient.getInstance();
-            const user = await bot.rest.get(Routes.user(userId)) as {username: string; global_name: string | null; avatar: string | null};
+            const user = await bot.rest.get(Routes.user(userId)) as {
+                username: string;
+                global_name: string | null;
+                avatar: string | null
+            };
 
             const avatar = user.avatar ? user.avatar.split('/').pop()?.split('.')[0] : null;
 
