@@ -83,7 +83,7 @@ export default class WebhookTopGGRoute implements TRoute {
             user_id: data.user.platform_id,
             entity_id: data.project.platform_id,
             entity_type: data.project.type,
-            platform: 'topgg',
+            platform: 'Top.gg',
             guild_id: parsedQuery?.guild_id || parsedQuery?.guildId || parsedQuery?.metadata,
         };
 

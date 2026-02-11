@@ -35,7 +35,7 @@ export default class WebhookDBLRoute implements TRoute {
             user_id: req.body.id,
             entity_id: settings.entity_id,
             entity_type: settings.entity_type,
-            platform: 'dbl',
+            platform: 'DiscordBotList.com',
         };
 
         Logger.info(`Received ${mappedData.type} from ${mappedData.user_id} for ${mappedData.entity_type} ${mappedData.entity_id}`, 'DBL');
