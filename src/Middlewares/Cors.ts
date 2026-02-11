@@ -2,12 +2,9 @@ import type {Middleware, TIncomingMessage, TMiddlewareNext, TServerResponse} fro
 import {normalize} from "@Utils/Http";
 
 const allowedOrigins = [
-    'https://api-hangman.discord.dad',
-    'https://hangman.discord.dad',
+    'https://discordbotlist.com',
     'http://localhost:4401',
-    'http://localhost:4402',
-    'https://hangman.discord.dad',
-    'https://1431408673724432596.discordsays.com',
+    'http://localhost:4402'
 ];
 
 const devOrigins = [
@@ -32,7 +29,7 @@ export default class CorsMiddleware implements Middleware {
 
         res.setHeader('Access-Control-Allow-Credentials', 'true');
         res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-        res.setHeader('Access-Control-Allow-Headers', 'Origin, X-Requested-With, Content-Type, Accept, Authorization');
+        res.setHeader('Access-Control-Allow-Headers', 'Origin, x-dbl-signature, X-Requested-With, Content-Type, Accept, Authorization');
 
         res.setHeader('Access-Control-Max-Age', '2');
 

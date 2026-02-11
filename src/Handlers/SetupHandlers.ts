@@ -364,8 +364,8 @@ export async function handleSetupFinish(ctx: Context, setupId: string) {
         const isEnabledNow = !wasDisabled;
 
         return ctx.update(successComponent(
-            'Votes - Setup Wizard\n-#' + (isEnabledNow ? 'Setup Enabled!' : 'Changes Saved!'),
-            isEnabledNow
+            'Votes - Setup Wizard\n-# ' + (wasDisabled && isEnabledNow ? 'Setup Enabled!' : 'Changes Saved!'),
+            wasDisabled && isEnabledNow
                 ? 'Your vote tracking setup has been enabled successfully and is now active!'
                 : 'Your vote tracking setup has been updated successfully!'
         ));

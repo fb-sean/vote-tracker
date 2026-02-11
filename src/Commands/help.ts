@@ -1,7 +1,6 @@
 import {Context} from "@Utils/Context";
 import {Command} from "@Types/Discord";
 import {ApplicationIntegrationType, ButtonStyle, ComponentType, InteractionContextType, MessageFlags} from "discord-api-types/v10";
-import {createSetupState} from "@Utils/SetupManager";
 
 export default class HelpCommand implements Command {
     data = {
@@ -74,7 +73,7 @@ export default class HelpCommand implements Command {
 
         components.push({
             type: ComponentType.TextDisplay,
-            content: 'Need help? Join our support server: discord.gg/ZVERh35',
+            content: 'Need help? Join our support server: <discord.gg/ZVERh35>',
         });
 
         return ctx.reply({
