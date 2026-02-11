@@ -1,6 +1,6 @@
 import type {TIncomingMessage, TRoute, TServerResponse} from "@Types/HttpClient";
 import crypto from "crypto";
-import {getParams, Response} from "@Utils/Http";
+import {getHeaders, getParams, Response} from "@Utils/Http";
 import Logger from "@Utils/Logger";
 import TopggConnectionModel from "@Schemas/Integrations/Topgg";
 import UserDataModel from "@Schemas/UserData";
@@ -16,12 +16,14 @@ export default class WebhookDBLRoute implements TRoute {
     path = '/webhooks/dbl/:token';
 
     async execute(req: TIncomingMessage, res: TServerResponse) {
+        const headers = getHeaders(req);
+
         const params = getParams(req, this);
-        if (!params.token) {
+        if (!params.token && !headers.authorization) {
             return Response(res, {error: 'Missing token'}, 400);
         }
 
-        const settings = await SettingsModel.findOne({auth_token: params.token, disabled: false});
+        const settings = await SettingsModel.findOne({auth_token: params.token ?? headers.authorization, disabled: false});
         if (!settings) {
             return Response(res, {message: 'Vote received (no settings configured)'});
         }
