@@ -36,6 +36,23 @@ export default class RegisterRoute implements TRoute {
         }
 
         if (type === 'integration.create') {
+            const alreadyExisting = await TopggConnectionModel.findOne({
+                project_platform: data.project.platform,
+                project_platform_id: data.project.platform_id,
+                project_type: data.project.type,
+            });
+
+            if (alreadyExisting) {
+                Logger.info(`Top.gg integration already registered for ${data.project.platform_id} by ${data.user.platform_id}`, 'INTEGRATIONS');
+
+                return Response(res, {
+                    webhook_url: `https://votes.discordbots.xyz/webhooks/top-gg/${alreadyExisting.internal_webhook_token}`,
+                    routes: [
+                        'vote.create'
+                    ]
+                });
+            }
+
             const internalWebhookToken = generateKey();
 
             await TopggConnectionModel.create({

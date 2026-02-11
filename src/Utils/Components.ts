@@ -31,6 +31,14 @@ export function errorComponent(title: string, text: string = 'Error...'): IConte
                                 content: text
                             }
                         ]
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1
+                    },
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: 'Need help? Join our support server: <discord.gg/ZVERh35>'
                     }
                 ]
             }

@@ -2,7 +2,7 @@ import {Context} from "@Utils/Context";
 import {
     APIMessageChannelSelectInteractionData,
     ComponentType,
-    MessageFlags,
+    MessageFlags, RESTGetAPIChannelMessageResult,
     RESTPostAPIChannelMessageJSONBody,
     Routes,
 } from "discord-api-types/v10";
@@ -38,6 +38,7 @@ import TopggConnectionModel from "@Schemas/Integrations/Topgg";
 import {generateKey} from "@Utils/Key";
 import {refreshCurrentStep as listRefreshCurrentStep} from "@Handlers/ListHandlers";
 import {errorComponent, infoComponent, successComponent} from "@Utils/Components";
+import {delay} from "bullmq";
 
 function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: number) {
     return {
@@ -164,11 +165,36 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Please enter your bot or server ID first.'));
     }
 
+    if (state.current_step === 2 && state.channel_id) {
+        const cooldown = await Redis.getInstance().get('discord:vt:test:cooldown:' + state.channel_id);
+        if (!cooldown) {
+            await Redis.getInstance().set('discord:vt:test:cooldown:' + state.channel_id, true, 2 * 60)
+
+            try {
+                const message = await DiscordClient.getInstance().rest.post(Routes.channelMessages(state.channel_id), {
+                    body: infoComponent('Votes - Setup Wizard', 'If you see this message, the test was successful!'),
+                }) as RESTGetAPIChannelMessageResult;
+
+                if (message && message.id) {
+                    try {
+                        await delay(1000);
+
+                        await DiscordClient.getInstance().rest.delete(Routes.channelMessage(state.channel_id, message.id));
+                    } catch (e) {
+
+                    }
+                }
+            } catch (error) {
+                return ctx.reply(errorComponent('Votes - Setup Wizard', 'Failed to send test message. Please check bot permissions before you continue.'));
+            }
+        }
+    }
+
     if (state.current_step === 4) {
         if (state.editing_id) {
             const next = await nextStep(setupId);
             if (!next) {
-                return ctx.reply({content: 'Cannot proceed further.'});
+                return ctx.reply(errorComponent('Votes - Setup Wizard', 'Cannot proceed further.'));
             }
 
             return listRefreshCurrentStep(ctx, setupId, next);

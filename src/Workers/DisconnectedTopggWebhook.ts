@@ -33,7 +33,7 @@ export default class DisconnectedTopggWebhookWorker implements TWorker {
                     return;
                 }
 
-                await this.sendWithRateLimit(channelId, errorComponent('Bright - Important Notification', 'Top.gg integration got deleted. You will no longer receive any vote notifications until you set it up again.')).catch(NoOperation);
+                await this.sendWithRateLimit(channelId, errorComponent('Votes - Important Notification', 'Top.gg integration got deleted. You will no longer receive any vote notifications until you set it up again.')).catch(NoOperation);
             }
 
             await SettingsModel.deleteMany({
