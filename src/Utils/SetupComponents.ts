@@ -501,10 +501,10 @@ export function buildFirstVoteMessageModal(setupId: string, currentValue: string
                     '- {votes.count.week} - 50\n' +
                     '- {votes.streak.current} - 12\n' +
                     '- {votes.streak.best} - 357\n' +
-                    '- {votes.last} - 1770667266 (UNIX timestamp)\n' +
+                    '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
                     '- {entity.type} - "bot" or "server"\n' +
                     '- {entity.id} - 813913649633951764\n' +
-                    '- {platform} - top.gg, etc.\n',
+                    '- {platform} - top.gg, etc.\n'
             },
             {
                 type: ComponentType.TextDisplay,
@@ -551,10 +551,10 @@ export function buildVoteMessageModal(setupId: string, currentValue: string): AP
                     '- {votes.count.week} - 50\n' +
                     '- {votes.streak.current} - 12\n' +
                     '- {votes.streak.best} - 357\n' +
-                    '- {votes.last} - 1770667266 (UNIX timestamp)\n' +
+                    '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
                     '- {entity.type} - "bot" or "server"\n' +
                     '- {entity.id} - 813913649633951764\n' +
-                    '- {platform} - top.gg, etc.\n',
+                    '- {platform} - top.gg, etc.\n'
             },
             {
                 type: ComponentType.TextDisplay,

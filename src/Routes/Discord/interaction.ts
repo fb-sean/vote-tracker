@@ -175,7 +175,7 @@ export default class InteractionRoute implements TRoute {
 
     async handleSetupComponent(ctx: Context, parts: string[]) {
         const action = parts[1];
-        const setupId = parts[parts.length - 1];
+        let setupId = parts[parts.length - 1];
 
         try {
             switch (action) {
@@ -238,6 +238,8 @@ export default class InteractionRoute implements TRoute {
                 case 'remove':
                     if (parts[2] === 'reward') {
                         const rewardIndex = parts[4];
+
+                        setupId = parts[3];
 
                         return handleSetupRemoveReward(ctx, setupId, rewardIndex);
                     }

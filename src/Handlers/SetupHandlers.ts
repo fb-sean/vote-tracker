@@ -63,7 +63,7 @@ export async function handleSetupBot(ctx: Context, setupId: string) {
         current_step: 1,
     });
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return ctx.update(buildPayload(buildEntityIdStep(setupId, 'bot', entityId)));
@@ -77,7 +77,7 @@ export async function handleSetupServer(ctx: Context, setupId: string) {
 
     const state = await updateSetupState(setupId, {entity_type: 'server', entity_id: serverId, current_step: 2});
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
@@ -86,7 +86,7 @@ export async function handleSetupServer(ctx: Context, setupId: string) {
 export async function handleSetupGame(ctx: Context, setupId: string) {
     const state = await updateSetupState(setupId, {entity_type: 'game', current_step: 1});
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return ctx.update(buildPayload(buildEntityIdStep(setupId, 'game', null)));
@@ -178,7 +178,7 @@ export async function handleSetupBack(ctx: Context, setupId: string) {
 export async function handleSetupNext(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     if (!state.entity_id) {
@@ -217,7 +217,7 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
 export async function handleSetupEnterEntityId(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     const entityType = state.entity_type || 'bot';
@@ -227,7 +227,7 @@ export async function handleSetupEnterEntityId(ctx: Context, setupId: string) {
 export async function handleSetupUsePreFetchedId(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     if (!state.entity_id) {
@@ -237,7 +237,7 @@ export async function handleSetupUsePreFetchedId(ctx: Context, setupId: string) 
     // Move to the channel and webhook step
     const updated = await updateSetupState(setupId, {current_step: 2});
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, updated)));
@@ -256,7 +256,7 @@ export async function handleSetupChannelSelect(ctx: Context, setupId: string) {
 
     const state = await updateSetupState(setupId, {channel_id: selectedChannelId});
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
@@ -307,7 +307,7 @@ export async function handleSetupTestChannel(ctx: Context, setupId: string) {
 export async function handleSetupEditFirstVote(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     const existingMessage = state.messages.find(m => m.type === 'first-vote');
@@ -318,7 +318,7 @@ export async function handleSetupEditFirstVote(ctx: Context, setupId: string) {
 export async function handleSetupEditVote(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     const existingMessage = state.messages.find(m => m.type === 'vote');
@@ -329,7 +329,7 @@ export async function handleSetupEditVote(ctx: Context, setupId: string) {
 export async function handleSetupAddReward(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     if (state.rewards.length >= 25) {
@@ -342,7 +342,7 @@ export async function handleSetupAddReward(ctx: Context, setupId: string) {
 export async function handleSetupRemoveReward(ctx: Context, setupId: string, rewardIndex: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     const index = parseInt(rewardIndex);
@@ -430,7 +430,7 @@ export async function handleSetupEntityIdModal(ctx: Context, setupId: string, en
 
     const state = await updateSetupState(setupId, {entity_id: entityId.trim(), current_step: 2});
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
@@ -449,7 +449,7 @@ export async function handleSetupWebhookModal(ctx: Context, setupId: string, web
         external_webhook_url: webhookUrl.trim() || null,
     });
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
@@ -458,7 +458,7 @@ export async function handleSetupWebhookModal(ctx: Context, setupId: string, web
 export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, message: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     let payload = message.trim();
@@ -503,7 +503,7 @@ export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, m
 export async function handleSetupVoteModal(ctx: Context, setupId: string, message: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     let payload = message.trim();
@@ -548,7 +548,7 @@ export async function handleSetupVoteModal(ctx: Context, setupId: string, messag
 export async function handleSetupAddRewardModal(ctx: Context, setupId: string, roleId: string, minVotes: string, durationMin: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     if (!roleId) {
@@ -669,7 +669,7 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
 export async function handleSetupPlatformTopGG(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     const webhookUrl = `https://votes.discordbots.xyz/webhooks/top-gg/${state.auth_token}`;
@@ -686,7 +686,7 @@ export async function handleSetupPlatformTopGG(ctx: Context, setupId: string) {
 export async function handleSetupPlatformDiscordBotList(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     const webhookUrl = `https://votes.discordbots.xyz/webhooks/dbl/${state.auth_token}`;
@@ -698,7 +698,7 @@ export async function handleSetupPlatformDiscordBotList(ctx: Context, setupId: s
 export async function handleSetupPlatformDiscordsCom(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     const webhookUrl = `https://votes.discordbots.xyz/webhooks/ds/${state.auth_token}`;
@@ -710,7 +710,7 @@ export async function handleSetupPlatformDiscordsCom(ctx: Context, setupId: stri
 export async function handleSetupPlatformBack(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return ctx.update(buildPayload(buildCompleteStep(setupId, state)));

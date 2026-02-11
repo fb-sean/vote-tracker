@@ -475,7 +475,7 @@ export async function handleListToggleEnable(ctx: Context, setupId: string) {
 
     const updated = await updateSetupState(setupId, {disable: false});
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return refreshCurrentStep(ctx, setupId, updated);
@@ -484,12 +484,12 @@ export async function handleListToggleEnable(ctx: Context, setupId: string) {
 export async function handleListToggleDisable(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.'});
+        return ctx.reply({content: 'Edit session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     const updated = await updateSetupState(setupId, {disable: true});
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired. Please start over.'});
+        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
     }
 
     return refreshCurrentStep(ctx, setupId, updated);
