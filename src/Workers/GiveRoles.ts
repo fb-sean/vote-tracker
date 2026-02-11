@@ -122,6 +122,7 @@ export default class GiveRolesWorker implements TWorker {
 
         if (hasNoPerms === 'true') {
             Logger.warn(`Guild ${guildId} has no role permissions (cached), skipping`, 'GIVE_ROLES');
+
             return;
         }
 
@@ -134,6 +135,7 @@ export default class GiveRolesWorker implements TWorker {
 
         if (!acquired) {
             await this.sleep(100);
+
             return this.giveRoleWithRateLimit(guildId, userId, roleId, durationMin);
         }
 
