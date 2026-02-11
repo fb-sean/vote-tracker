@@ -24,15 +24,24 @@ import {
     handleSetupPlatformDiscordsCom,
     handleSetupPlatformTopGG,
     handleSetupRemoveReward,
+    handleSetupSelectConnection,
     handleSetupServer,
     handleSetupTestChannel,
     handleSetupUsePreFetchedId,
     handleSetupVoteModal,
     handleSetupWebhookModal,
 } from "@Handlers/SetupHandlers";
-import {handleListDelete, handleListDeleteCancel, handleListDeleteConfirm, handleListEdit, handleListDump, handleListToggleDisable, handleListToggleEnable,} from "@Handlers/ListHandlers";
-import {createSetupState, getAllSetupsForServer, buildSetupList} from "@Utils/SetupManager";
-import {buildEntitySelectionStep} from "@Utils/SetupComponents";
+import {
+    handleListDelete,
+    handleListDeleteCancel,
+    handleListDeleteConfirm,
+    handleListEdit,
+    handleListDump,
+    handleListToggleDisable,
+    handleListToggleEnable,
+} from "@Handlers/ListHandlers";
+import {getAllSetupsForServer, buildSetupList} from "@Utils/SetupManager";
+import {errorComponent} from "@Utils/Components";
 
 export default class InteractionRoute implements TRoute {
     method = 'POST';
@@ -212,6 +221,15 @@ export default class InteractionRoute implements TRoute {
                         return handleSetupChannelSelect(ctx, setupId);
                     }
 
+                    if (parts[2] === 'connection') {
+                        const selectedValue = (ctx.interaction.data as any).values?.[0];
+                        if (!selectedValue) {
+                            return ctx.reply({content: 'No connection selected.'});
+                        }
+
+                        return handleSetupSelectConnection(ctx, setupId, selectedValue);
+                    }
+
                     break;
                 case 'test':
                     if (parts[2] === 'channel') {
@@ -332,25 +350,24 @@ export default class InteractionRoute implements TRoute {
                 case 'dump':
                     return handleListDump(ctx, parts[2]);
                 case 'delete':
-                    // list_delete_{setupId} -> parts: ['list', 'delete', setupId]
-                    // list_delete_confirm_{setupId} -> parts: ['list', 'delete', 'confirm', setupId]
-                    // list_delete_cancel_{setupId} -> parts: ['list', 'delete', 'cancel', setupId]
                     if (parts[2] === 'confirm') {
                         return handleListDeleteConfirm(ctx, parts[3]);
                     }
+
                     if (parts[2] === 'cancel') {
                         return handleListDeleteCancel(ctx, parts[3]);
                     }
+
                     return handleListDelete(ctx, parts[2]);
                 case 'toggle':
-                    // list_toggle_enable_{setupId} -> parts: ['list', 'toggle', 'enable', setupId]
-                    // list_toggle_disable_{setupId} -> parts: ['list', 'toggle', 'disable', setupId]
                     if (parts[2] === 'enable') {
                         return handleListToggleEnable(ctx, parts[3]);
                     }
+
                     if (parts[2] === 'disable') {
                         return handleListToggleDisable(ctx, parts[3]);
                     }
+
                     break;
                 default:
                     return ctx.reply({content: 'Unknown list action.'});
@@ -358,6 +375,7 @@ export default class InteractionRoute implements TRoute {
         } catch (error) {
             Logger.error(`Error handling list component ${action}: ${error}`, 'LIST');
             console.log(error);
+
             return ctx.reply({content: 'An error occurred while processing your request.'});
         }
     }
@@ -368,20 +386,20 @@ export default class InteractionRoute implements TRoute {
         try {
             switch (action) {
                 case 'setup':
-                    if (!ctx.isInGuild) {
-                        return ctx.reply({content: 'Setup can only be used in a server.'});
+                    const command = DiscordClient.getInstance().getCommand('setup');
+                    if (!command || !command.execute) {
+                        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Something went wrong.'));
                     }
-                    const setupId = await createSetupState(ctx.interaction.guild_id!, ctx.user.id);
-                    return ctx.update({
-                        ...buildEntitySelectionStep(setupId),
-                        flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
-                    });
+
+                    return await command.execute(ctx, {directUpdate: true});
                 case 'list':
                     if (!ctx.isInGuild) {
                         return ctx.reply({content: 'List can only be used in a server.'});
                     }
+
                     const setups = await getAllSetupsForServer(ctx.interaction.guild_id!);
                     const listPayload = buildSetupList(setups, ctx.interaction.guild_id!);
+
                     return ctx.update({
                         ...listPayload,
                         flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
@@ -392,6 +410,7 @@ export default class InteractionRoute implements TRoute {
         } catch (error) {
             Logger.error(`Error handling help component ${action}: ${error}`, 'HELP');
             console.log(error);
+
             return ctx.reply({content: 'An error occurred while processing your request.'});
         }
     }

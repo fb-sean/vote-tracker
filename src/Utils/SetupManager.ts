@@ -244,6 +244,29 @@ export async function createEditState(setupId: string, userId: string): Promise<
     return sessionId;
 }
 
+export async function getUnsetupConnections(userId: string) {
+    const connections = await TopggConnectionModel.find({
+        user_id: userId,
+        project_type: 'bot',
+    });
+
+    if (connections.length === 0) {
+        return [];
+    }
+
+    const platformIds = connections.map(c => c.project_platform_id).filter((id): id is string => !!id);
+    const setupEntityIds = await SettingsModel.find({
+        entity_id: {$in: platformIds},
+    }).distinct('entity_id');
+
+    return connections.filter(c => c.project_platform_id && !setupEntityIds.includes(c.project_platform_id));
+}
+
+export async function shouldShowUnsetupConnections(userId: string): Promise<boolean> {
+    const unsetupConnections = await getUnsetupConnections(userId);
+    return unsetupConnections.length > 0;
+}
+
 export function buildSetupList(setups: any[], serverId: string) {
     const components: any[] = [
         {

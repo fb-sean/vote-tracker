@@ -6,6 +6,8 @@ import {
     RESTPostAPIChannelMessageJSONBody
 } from "discord-api-types/v10";
 import {TSetupState} from "@Utils/SetupManager";
+import {TopggConnection} from "@Schemas/Integrations/Topgg";
+import {BrightImages} from "@Utils/BrightImages";
 
 export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMessageJSONBody {
     return {
@@ -57,6 +59,75 @@ export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMes
                     },
                 ],
             },
+        ],
+    };
+}
+
+export function buildUnsetupConnectionsStep(setupId: string, connections: TopggConnection[]): RESTPostAPIChannelMessageJSONBody {
+    return {
+        components: [
+            {
+                type: ComponentType.Container,
+                accent_color: 0x616ee3,
+                components: [
+                    {
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Thumbnail,
+                            media: {
+                                url: BrightImages.Peace
+                            }
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: '### Bright - Setup Wizard\n-# Top.gg Connection'
+                            },
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: `We found **${connections.length.toLocaleString()}** Top.gg connection${connections.length > 1 ? 's' : ''} linked to your account that ${connections.length > 1 ? 'haven’t' : 'hasn’t'} been configured. Would you like to set one up now?`
+                            },
+                        ]
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.StringSelect,
+                                custom_id: `setup_select_connection_${setupId}`,
+                                options: [
+                                    ...connections.map((conn, index) => ({
+                                        label: `Bot ID: ${conn.project_platform_id}`,
+                                        value: `conn_${conn.project_platform_id}`,
+                                        description: `Click to set up this bot`,
+                                    })),
+                                    {
+                                        label: "No, I don't want to use this",
+                                        value: 'decline',
+                                        description: 'Setup one manually.',
+                                    }
+                                ],
+                                placeholder: 'Select a Top.gg connection to set up...',
+                            },
+                        ],
+                    },
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Danger,
+                                label: 'Cancel',
+                                custom_id: `setup_cancel_${setupId}`,
+                            },
+                        ],
+                    },
+                ]
+            }
         ],
     };
 }

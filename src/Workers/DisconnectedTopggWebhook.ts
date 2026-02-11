@@ -6,6 +6,8 @@ import Redis from "@API/RedisCache";
 import Logger from "@Utils/Logger";
 import type {IDisconnectedTopggWebhookPayload} from "@Types/Workers";
 import NoOperation from "@Utils/NoOperation";
+import {errorComponent} from "@Utils/Components";
+import {IContextPayload} from "@Types/Context";
 
 export default class DisconnectedTopggWebhookWorker implements TWorker {
     jobName = EWorkerJobs.DisconnectedTopggWebhook;
@@ -26,26 +28,12 @@ export default class DisconnectedTopggWebhookWorker implements TWorker {
             for (const setting of settings) {
                 const channelId = setting.channel_id;
                 if (!channelId) {
-                    Logger.warn(`No channel configured for ${setting.server_id}`, 'SEND_MESSAGE');
+                    Logger.warn(`No channel configured for ${setting.server_id}`, 'DISCONNECTED_TOPGG_WEBHOOK');
 
                     return;
                 }
 
-                await this.sendWithRateLimit(channelId, {
-                    components: [
-                        {
-                            type: ComponentType.Container,
-                            accent_color: 15548997,
-                            components: [
-                                {
-                                    type: ComponentType.TextDisplay,
-                                    content: '## ⚠️ Important:\nTop.gg integration got deleted. You will no longer receive any vote notifications until you set it up again.',
-                                },
-                            ],
-                        }
-                    ],
-                    flags: MessageFlags.IsComponentsV2,
-                }).catch(NoOperation);
+                await this.sendWithRateLimit(channelId, errorComponent('Bright - Important Notification', 'Top.gg integration got deleted. You will no longer receive any vote notifications until you set it up again.')).catch(NoOperation);
             }
 
             await SettingsModel.deleteMany({
@@ -55,22 +43,22 @@ export default class DisconnectedTopggWebhookWorker implements TWorker {
 
             const duration = Date.now() - startTime;
 
-            Logger.info(`SendMessage completed in ${duration}ms`, 'SEND_MESSAGE');
+            Logger.info(`SendMessage completed in ${duration}ms`, 'DISCONNECTED_TOPGG_WEBHOOK');
         } catch (error) {
-            Logger.error(`Error in SendMessage: ${error}`, 'SEND_MESSAGE');
+            Logger.error(`Error in SendMessage: ${error}`, 'DISCONNECTED_TOPGG_WEBHOOK');
             console.log(error);
             console.log(d);
         }
     }
 
-    private async sendWithRateLimit(channelId: string, message: Record<string, unknown>): Promise<void> {
+    private async sendWithRateLimit(channelId: string, message: IContextPayload): Promise<void> {
         const bot = DiscordClient.getInstance();
 
         const permCacheKey = `discord:vt:channel_no_perms:${channelId}`;
         const hasNoPerms = await Redis.getInstance().get<string>(permCacheKey);
 
         if (hasNoPerms === 'true') {
-            Logger.warn(`Channel ${channelId} has no permissions (cached), skipping`, 'SEND_MESSAGE');
+            Logger.warn(`Channel ${channelId} has no permissions (cached), skipping`, 'DISCONNECTED_TOPGG_WEBHOOK');
 
             return;
         }
@@ -100,7 +88,7 @@ export default class DisconnectedTopggWebhookWorker implements TWorker {
             if (discordError.code === 429) {
                 const retryAfter = discordError.retry_after || 1;
 
-                Logger.warn(`Rate limited, waiting ${retryAfter}s`, 'SEND_MESSAGE');
+                Logger.warn(`Rate limited, waiting ${retryAfter}s`, 'DISCONNECTED_TOPGG_WEBHOOK');
 
                 await Redis.getInstance().set('discord:vt:rate_limited', 'true', Math.ceil(retryAfter));
 
@@ -110,7 +98,7 @@ export default class DisconnectedTopggWebhookWorker implements TWorker {
             }
 
             if (discordError.code === 50001 || discordError.code === 50013 || discordError.code === 10003) {
-                Logger.warn(`No permissions for channel ${channelId}, caching failure`, 'SEND_MESSAGE');
+                Logger.warn(`No permissions for channel ${channelId}, caching failure`, 'DISCONNECTED_TOPGG_WEBHOOK');
 
                 await Redis.getInstance().set(permCacheKey, 'true', this.PERMISSION_CACHE_TTL);
 

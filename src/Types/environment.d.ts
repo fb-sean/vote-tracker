@@ -23,6 +23,8 @@ declare global {
             PROXY_PORT: string;
             PROXY_PASSWORD: string;
             PROXY_USERNAME: string;
+
+            TOP_GG_TOKEN: string;
         }
     }
 }

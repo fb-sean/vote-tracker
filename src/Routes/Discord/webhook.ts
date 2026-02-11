@@ -73,30 +73,34 @@ export default class WebhookRoute implements TRoute {
     }
 
     private async handleAuthorized(event: ApplicationAuthorizedEvent, res: TServerResponse) {
-        const guildId = event.event?.guild?.id;
+        // @ts-ignore
+        const guildId = event.event.data.guild?.id;
 
         if (!guildId) {
             Logger.warn('APPLICATION_AUTHORIZED event missing guild_id', 'WEBHOOK');
+
             return Response(res, {error: 'Missing guild_id'}, 400);
         }
 
         Logger.info(`Application authorized in guild ${guildId}`, 'WEBHOOK');
 
-        const result = await SettingsModel.updateMany(
-            {server_id: guildId},
-            {$set: {disabled: false}}
-        );
+        // const result = await SettingsModel.updateMany(
+        //     {server_id: guildId},
+        //     {$set: {disabled: false}}
+        // );
+        //
+        // Logger.info(`Re-enabled ${result.modifiedCount} setup(s) for guild ${guildId}`, 'WEBHOOK');
 
-        Logger.info(`Re-enabled ${result.modifiedCount} setup(s) for guild ${guildId}`, 'WEBHOOK');
-
-        return Response(res, {message: 'Authorized', updated: result.modifiedCount});
+        return Response(res, {message: 'Authorized'});
     }
 
     private async handleDeauthorized(event: ApplicationDeauthorizedEvent, res: TServerResponse) {
-        const guildId = event.event?.data?.guild_id;
+        // @ts-ignore
+        const guildId = event.event.data.guild?.id;
 
         if (!guildId) {
             Logger.warn('APPLICATION_DEAUTHORIZED event missing guild_id', 'WEBHOOK');
+
             return Response(res, {error: 'Missing guild_id'}, 400);
         }
 

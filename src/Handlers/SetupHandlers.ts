@@ -23,6 +23,7 @@ import {
     buildCompleteStep,
     buildEntityIdModal,
     buildEntityIdStep,
+    buildEntitySelectionStep,
     buildExternalWebhookModal,
     buildFirstVoteMessageModal,
     buildMessagesStep,
@@ -35,6 +36,8 @@ import {
 import Redis from "@API/RedisCache";
 import TopggConnectionModel from "@Schemas/Integrations/Topgg";
 import {generateKey} from "@Utils/Key";
+import {refreshCurrentStep as listRefreshCurrentStep} from "@Handlers/ListHandlers";
+import {errorComponent, infoComponent, successComponent} from "@Utils/Components";
 
 function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: number) {
     return {
@@ -44,40 +47,27 @@ function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: num
 }
 
 export async function handleSetupBot(ctx: Context, setupId: string) {
-    const userId = ctx.interaction.user?.id || ctx.interaction.member?.user?.id;
-    if (!userId) {
-        return ctx.reply({content: 'Unable to identify user.'});
-    }
-
-    // Check for existing Top.gg connection for this user with bot type
-    const existingConnection = await TopggConnectionModel.findOne({
-        user_id: userId,
-        project_type: 'bot',
-    });
-
-    const entityId = existingConnection?.project_platform_id || null;
-
     const state = await updateSetupState(setupId, {
         entity_type: 'bot',
-        entity_id: entityId,
+        entity_id: null,
         current_step: 1,
     });
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
-    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'bot', entityId)));
+    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'bot', null)));
 }
 
 export async function handleSetupServer(ctx: Context, setupId: string) {
     const serverId = ctx.interaction.guild_id;
     if (!serverId) {
-        return ctx.reply({content: 'This command can only be used in a server.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'This command can only be used in a server.'));
     }
 
     const state = await updateSetupState(setupId, {entity_type: 'server', entity_id: serverId, current_step: 2});
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
@@ -86,7 +76,7 @@ export async function handleSetupServer(ctx: Context, setupId: string) {
 export async function handleSetupGame(ctx: Context, setupId: string) {
     const state = await updateSetupState(setupId, {entity_type: 'game', current_step: 1});
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     return ctx.update(buildPayload(buildEntityIdStep(setupId, 'game', null)));
@@ -95,28 +85,17 @@ export async function handleSetupGame(ctx: Context, setupId: string) {
 export async function handleSetupCancel(ctx: Context, setupId: string) {
     await deleteSetupState(setupId);
 
-    return ctx.update(buildPayload({
-        components: [
-            {
-                type: ComponentType.TextDisplay,
-                content: '# Setup Cancelled',
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: 'The setup has been cancelled. No changes have been saved.',
-            },
-        ],
-    }));
+    return ctx.update(successComponent('Bright - Setup Wizard', 'The setup has been cancelled. No changes have been saved.'));
 }
 
 export async function handleSetupBack(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     if (state.editing_id && state.current_step <= 2) {
-        return ctx.reply({content: 'Cannot go back further. The entity type and ID are already set.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Cannot go back further. The entity type and ID are already set.'));
     }
 
     if (state.current_step === 0) {
@@ -178,11 +157,11 @@ export async function handleSetupBack(ctx: Context, setupId: string) {
 export async function handleSetupNext(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     if (!state.entity_id) {
-        return ctx.reply({content: 'Please enter your bot or server ID first.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Please enter your bot or server ID first.'));
     }
 
     if (state.current_step === 4) {
@@ -192,15 +171,13 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
                 return ctx.reply({content: 'Cannot proceed further.'});
             }
 
-            const {refreshCurrentStep: listRefreshCurrentStep} = await import('@Handlers/ListHandlers');
-
             return listRefreshCurrentStep(ctx, setupId, next);
         }
 
         const authToken = generateKey();
         const updated = await updateSetupState(setupId, {auth_token: authToken});
         if (!updated) {
-            return ctx.reply({content: 'Setup session expired.'});
+            return ctx.reply(errorComponent('Bright - Setup Wizard', 'Updating the session failed. Please start a new setup.'));
         }
 
         return ctx.update(buildPayload(buildCompleteStep(setupId, updated)));
@@ -208,7 +185,7 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
 
     const next = await nextStep(setupId);
     if (!next) {
-        return ctx.reply({content: 'Cannot proceed further.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Cannot proceed further.'));
     }
 
     return refreshCurrentStep(ctx, setupId, next);
@@ -217,7 +194,7 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
 export async function handleSetupEnterEntityId(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     const entityType = state.entity_type || 'bot';
@@ -227,36 +204,31 @@ export async function handleSetupEnterEntityId(ctx: Context, setupId: string) {
 export async function handleSetupUsePreFetchedId(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     if (!state.entity_id) {
-        return ctx.reply({content: 'No pre-fetched ID found. Please enter an ID manually.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'No pre-fetched ID found. Please enter an ID manually.'));
     }
 
-    // Move to the channel and webhook step
     const updated = await updateSetupState(setupId, {current_step: 2});
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Updating the session failed. Please start a new setup.'));
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, updated)));
 }
 
 export async function handleSetupChannelSelect(ctx: Context, setupId: string) {
-    if (!ctx.isComponent()) {
-        return ctx.reply({content: 'Invalid interaction type.'});
-    }
-
     const interactionData = ctx.interaction.data as APIMessageChannelSelectInteractionData;
     const selectedChannelId = interactionData.values?.[0];
     if (!selectedChannelId) {
-        return ctx.reply({content: 'No channel selected.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Please select a channel to continue.'));
     }
 
     const state = await updateSetupState(setupId, {channel_id: selectedChannelId});
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
@@ -269,45 +241,31 @@ export async function handleSetupEnterWebhook(ctx: Context, setupId: string) {
 export async function handleSetupTestChannel(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state || !state.channel_id) {
-        return ctx.reply({
-            content: 'No channel set to test.',
-            flags: MessageFlags.Ephemeral
-        });
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Please select a channel to continue.'));
     }
 
     const cooldown = await Redis.getInstance().get('discord:vt:test:cooldown:' + state.channel_id);
     if (cooldown) {
-        return ctx.reply({
-            content: 'Test message already sent in the last 2 minutes. Please wait for 2 minutes before sending another test message.',
-            flags: MessageFlags.Ephemeral
-        });
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Test message already sent in the last 2 minutes. Please wait for 2 minutes before sending another test message.'));
     }
 
     await Redis.getInstance().set('discord:vt:test:cooldown:' + state.channel_id, true, 2 * 60)
 
     try {
         await DiscordClient.getInstance().rest.post(Routes.channelMessages(state.channel_id), {
-            body: {
-                content: '🎉 Test message from Vote Tracker!\n\nThis is a test message to verify that the logging channel is working correctly.',
-            },
+            body: infoComponent('Bright - Setup Wizard', 'If you see this message, the test was successful!'),
         });
 
-        return ctx.reply({
-            content: '✅ Test message sent successfully! Check the channel.',
-            flags: MessageFlags.Ephemeral
-        });
+        return ctx.reply(successComponent('Bright - Setup Wizard', 'Sent the test message successfully.'));
     } catch (error) {
-        return ctx.reply({
-            content: '❌ Failed to send test message. Please check bot permissions.',
-            flags: MessageFlags.Ephemeral
-        });
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Failed to send test message. Please check bot permissions.'));
     }
 }
 
 export async function handleSetupEditFirstVote(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     const existingMessage = state.messages.find(m => m.type === 'first-vote');
@@ -318,7 +276,7 @@ export async function handleSetupEditFirstVote(ctx: Context, setupId: string) {
 export async function handleSetupEditVote(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     const existingMessage = state.messages.find(m => m.type === 'vote');
@@ -329,11 +287,11 @@ export async function handleSetupEditVote(ctx: Context, setupId: string) {
 export async function handleSetupAddReward(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     if (state.rewards.length >= 25) {
-        return ctx.reply({content: 'Maximum of 25 reward roles reached.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Maximum of 25 reward roles reached.'));
     }
 
     return ctx.showModal(buildAddRewardModal(setupId));
@@ -342,19 +300,19 @@ export async function handleSetupAddReward(ctx: Context, setupId: string) {
 export async function handleSetupRemoveReward(ctx: Context, setupId: string, rewardIndex: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     const index = parseInt(rewardIndex);
     if (isNaN(index) || index < 0 || index >= state.rewards.length) {
-        return ctx.reply({content: 'Invalid reward index.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Invalid reward, please try again or contact the support.'));
     }
 
     const updated = await updateSetupState(setupId, {
         rewards: state.rewards.filter((_, i) => i !== index),
     });
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Updating the session failed. Please start a new setup.'));
     }
 
     return ctx.update(buildPayload(buildRewardsStep(setupId, updated)));
@@ -363,74 +321,58 @@ export async function handleSetupRemoveReward(ctx: Context, setupId: string, rew
 export async function handleSetupFinish(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     if (state.editing_id) {
         const result = await saveSetupToDatabase(setupId);
         if (!result.success) {
             if (result.error) {
-                return ctx.reply({content: `❌ ${result.error}`, flags: MessageFlags.Ephemeral});
+                return ctx.reply(errorComponent('Bright - Setup Wizard', result.error));
             }
 
-            return ctx.reply({content: '❌ Failed to update setup. Please try again.', flags: MessageFlags.Ephemeral});
+            return ctx.reply(errorComponent('Bright - Setup Wizard', 'Failed to update setup. Please try again.'));
         }
 
         const wasDisabled = state.disable;
         const isEnabledNow = !wasDisabled;
 
-        return ctx.update(buildPayload({
-            components: [
-                {
-                    type: ComponentType.TextDisplay,
-                    content: isEnabledNow ? '# ✅ Setup Enabled!' : '# ✅ Changes Saved!',
-                },
-                {
-                    type: ComponentType.TextDisplay,
-                    content: isEnabledNow
-                        ? 'Your vote tracking setup has been enabled successfully and is now active!'
-                        : 'Your vote tracking setup has been updated successfully!',
-                },
-            ],
-        }));
+        return ctx.update(successComponent(
+            'Bright - Setup Wizard\n-#' + (isEnabledNow ? 'Setup Enabled!' : 'Changes Saved!'),
+            isEnabledNow
+                ? 'Your vote tracking setup has been enabled successfully and is now active!'
+                : 'Your vote tracking setup has been updated successfully!'
+        ));
     }
 
     const existingCount = await countSetupsForServer(state.server_id);
     if (existingCount >= 25) {
-        return ctx.reply({content: '❌ Maximum of 25 setups per server reached. Please delete an existing setup first.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Maximum of 25 setups per server reached. Please delete an existing setup first.'));
     }
 
     const result = await saveSetupToDatabase(setupId);
     if (!result.success) {
         if (result.error) {
-            return ctx.reply({content: `❌ ${result.error}`, flags: MessageFlags.Ephemeral});
+            return ctx.reply(errorComponent('Bright - Setup Wizard', result.error));
         }
 
-        return ctx.reply({content: '❌ Failed to save setup. Please try again.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Failed to save setup. Please try again.'));
     }
 
-    return ctx.update(buildPayload({
-        components: [
-            {
-                type: ComponentType.TextDisplay,
-                content: '# ✅ Setup Complete!',
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: 'Your vote tracking setup has been saved successfully!',
-            }
-        ],
-    }));
+    return ctx.update(successComponent(
+        'Bright - Setup Wizard\n-# Setup Complete!',
+        'Your vote tracking setup has been saved successfully!'
+    ));
 }
 
 export async function handleSetupEntityIdModal(ctx: Context, setupId: string, entityId: string) {
     if (!entityId || entityId.trim().length === 0) {
-        return ctx.reply({content: 'ID cannot be empty.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'The ID cannot be empty.'));
     }
 
     const state = await updateSetupState(setupId, {entity_id: entityId.trim(), current_step: 2});
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
@@ -441,7 +383,7 @@ export async function handleSetupWebhookModal(ctx: Context, setupId: string, web
         try {
             new URL(webhookUrl.trim());
         } catch {
-            return ctx.reply({content: 'Invalid webhook URL format.'});
+            return ctx.reply(errorComponent('Bright - Setup Wizard', 'Invalid webhook URL format.'));
         }
     }
 
@@ -449,7 +391,7 @@ export async function handleSetupWebhookModal(ctx: Context, setupId: string, web
         external_webhook_url: webhookUrl.trim() || null,
     });
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, state)));
@@ -458,7 +400,7 @@ export async function handleSetupWebhookModal(ctx: Context, setupId: string, web
 export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, message: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     let payload = message.trim();
@@ -494,7 +436,7 @@ export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, m
 
     const updated = await updateSetupState(setupId, {messages: updatedMessages});
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Updating the session failed. Please start a new setup.'));
     }
 
     return ctx.update(buildPayload(buildMessagesStep(setupId, updated)));
@@ -503,7 +445,7 @@ export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, m
 export async function handleSetupVoteModal(ctx: Context, setupId: string, message: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     let payload = message.trim();
@@ -539,7 +481,7 @@ export async function handleSetupVoteModal(ctx: Context, setupId: string, messag
 
     const updated = await updateSetupState(setupId, {messages: updatedMessages});
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Updating the session failed. Please start a new setup.'));
     }
 
     return ctx.update(buildPayload(buildMessagesStep(setupId, updated)));
@@ -548,26 +490,26 @@ export async function handleSetupVoteModal(ctx: Context, setupId: string, messag
 export async function handleSetupAddRewardModal(ctx: Context, setupId: string, roleId: string, minVotes: string, durationMin: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     if (!roleId) {
-        return ctx.reply({content: 'No role selected. Please try again.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'No role selected. Please try again.'));
     }
 
     if (state.rewards.length >= 25) {
-        return ctx.reply({content: 'Maximum of 25 reward roles reached.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Maximum of 25 reward roles reached.'));
     }
 
     const minVotesNum = minVotes && minVotes.trim().length > 0 ? parseInt(minVotes) : 0;
     const durationMinNum = durationMin && durationMin.trim().length > 0 ? parseInt(durationMin) : 0;
 
     if (isNaN(minVotesNum) || minVotesNum < 0) {
-        return ctx.reply({content: 'Invalid minimum votes value.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Invalid minimum votes value.'));
     }
 
     if (isNaN(durationMinNum) || durationMinNum < 0) {
-        return ctx.reply({content: 'Invalid duration value.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Invalid duration value.'));
     }
 
     const updated = await updateSetupState(setupId, {
@@ -581,7 +523,7 @@ export async function handleSetupAddRewardModal(ctx: Context, setupId: string, r
         ],
     });
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired.'});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Updating the session failed. Please start a new setup.'));
     }
 
     return ctx.update(buildPayload(buildRewardsStep(setupId, updated)));
@@ -620,12 +562,12 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
                             label: 'Server',
                             custom_id: `setup_server_${setupId}`,
                         },
-                        {
-                            type: ComponentType.Button,
-                            style: 1,
-                            label: 'Game',
-                            custom_id: `setup_game_${setupId}`,
-                        },
+                        // {
+                        //     type: ComponentType.Button,
+                        //     style: 1,
+                        //     label: 'Game',
+                        //     custom_id: `setup_game_${setupId}`,
+                        // },
                     ],
                 },
                 {
@@ -669,7 +611,7 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
 export async function handleSetupPlatformTopGG(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     const webhookUrl = `https://votes.discordbots.xyz/webhooks/top-gg/${state.auth_token}`;
@@ -686,7 +628,7 @@ export async function handleSetupPlatformTopGG(ctx: Context, setupId: string) {
 export async function handleSetupPlatformDiscordBotList(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     const webhookUrl = `https://votes.discordbots.xyz/webhooks/dbl/${state.auth_token}`;
@@ -698,7 +640,7 @@ export async function handleSetupPlatformDiscordBotList(ctx: Context, setupId: s
 export async function handleSetupPlatformDiscordsCom(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     const webhookUrl = `https://votes.discordbots.xyz/webhooks/ds/${state.auth_token}`;
@@ -710,8 +652,32 @@ export async function handleSetupPlatformDiscordsCom(ctx: Context, setupId: stri
 export async function handleSetupPlatformBack(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
     return ctx.update(buildPayload(buildCompleteStep(setupId, state)));
+}
+
+export async function handleSetupSelectConnection(ctx: Context, setupId: string, selectedValue: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Setup session expired. Please start over.'));
+    }
+
+    if (selectedValue === 'decline') {
+        return ctx.update(buildPayload(buildEntitySelectionStep(setupId)));
+    }
+
+    const entityId = selectedValue.replace('conn_', '');
+
+    const updated = await updateSetupState(setupId, {
+        entity_type: 'bot',
+        entity_id: entityId,
+        current_step: 2,
+    });
+    if (!updated) {
+        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Updating the session failed. Please start a new setup.'));
+    }
+
+    return ctx.update(buildPayload(buildChannelAndWebhookStep(setupId, updated)));
 }

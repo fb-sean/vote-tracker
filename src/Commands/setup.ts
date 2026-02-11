@@ -1,8 +1,9 @@
 import {Context} from "@Utils/Context";
 import {Command} from "@Types/Discord";
 import {ApplicationIntegrationType, InteractionContextType, MessageFlags,} from "discord-api-types/v10";
-import {createSetupState} from "@Utils/SetupManager";
-import {buildEntitySelectionStep} from "@Utils/SetupComponents";
+import {createSetupState, getUnsetupConnections} from "@Utils/SetupManager";
+import {buildEntitySelectionStep, buildUnsetupConnectionsStep} from "@Utils/SetupComponents";
+import {errorComponent, loadingComponent} from "@Utils/Components";
 
 export default class SetupCommand implements Command {
     data = {
@@ -12,16 +13,29 @@ export default class SetupCommand implements Command {
         contexts: [InteractionContextType.Guild],
     };
 
-    async execute(ctx: Context) {
+    async execute(ctx: Context, additional) {
+        if (additional && additional.directUpdate) {
+            await ctx.update(loadingComponent('Bright - Setup Wizard', 'Baking some data together, give me a second!'));
+        } else {
+            await ctx.reply(loadingComponent('Bright - Setup Wizard', 'Baking some data together, give me a second!'));
+        }
+
         if (!ctx.isInGuild) {
-            return ctx.reply({
-                content: 'This command can only be used in a server.',
-            });
+            return ctx.editReply(errorComponent('Bright - Setup Wizard', 'This command can only be used in a server.'));
         }
 
         const setupId = await createSetupState(ctx.interaction.guild_id!, ctx.user.id);
 
-        return ctx.reply({
+        const unsetupConnections = await getUnsetupConnections(ctx.user.id);
+
+        if (unsetupConnections.length > 0) {
+            return ctx.editReply({
+                ...buildUnsetupConnectionsStep(setupId, unsetupConnections),
+                flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
+            });
+        }
+
+        return ctx.editReply({
             ...buildEntitySelectionStep(setupId),
             flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
         });
