@@ -388,7 +388,7 @@ export default class InteractionRoute implements TRoute {
                 case 'setup':
                     const command = DiscordClient.getInstance().getCommand('setup');
                     if (!command || !command.execute) {
-                        return ctx.reply(errorComponent('Bright - Setup Wizard', 'Something went wrong.'));
+                        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Something went wrong.'));
                     }
 
                     return await command.execute(ctx, {directUpdate: true});

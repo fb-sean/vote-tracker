@@ -81,7 +81,7 @@ export function buildUnsetupConnectionsStep(setupId: string, connections: TopggC
                         components: [
                             {
                                 type: ComponentType.TextDisplay,
-                                content: '### Bright - Setup Wizard\n-# Top.gg Connection'
+                                content: '### Votes - Setup Wizard\n-# Top.gg Connection'
                             },
                             {
                                 type: ComponentType.TextDisplay,
