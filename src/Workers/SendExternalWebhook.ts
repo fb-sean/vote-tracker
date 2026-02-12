@@ -3,6 +3,7 @@ import SettingsModel from "@Schemas/Settings";
 import Logger from "@Utils/Logger";
 import type {ISendExternalWebhookPayload} from "@Types/Workers";
 import {ProxyAgent} from "undici";
+import Redis from "@API/RedisCache";
 
 export default class SendExternalWebhookWorker implements TWorker {
     jobName = EWorkerJobs.SendExternalWebhook;
@@ -76,7 +77,14 @@ export default class SendExternalWebhookWorker implements TWorker {
 
     private async sendWebhook(url: string, payload: Record<string, unknown>): Promise<void> {
         try {
-            const dispatcher = this.getProxyAgent();
+            const errorCount = await Redis.getInstance().get<number>('vt:externalwebhookerrors:' + url);
+            if (errorCount && errorCount >= 15) {
+                Logger.warn(`External webhook ${url} has been hit too many times, skipping`, 'EXTERNAL_WEBHOOK');
+
+                return;
+            }
+
+            // const dispatcher = this.getProxyAgent();
             const fetchOptions: RequestInit = {
                 method: 'POST',
                 headers: {
@@ -86,20 +94,23 @@ export default class SendExternalWebhookWorker implements TWorker {
                 body: JSON.stringify(payload),
             };
 
-            if (dispatcher) {
-                (fetchOptions as {dispatcher: unknown}).dispatcher = dispatcher;
-            }
+            // if (dispatcher) {
+            //     (fetchOptions as {dispatcher: unknown}).dispatcher = dispatcher;
+            // }
 
             const response = await fetch(url, fetchOptions);
 
             if (response.status >= 400) {
+                await Redis.getInstance().set('vt:externalwebhookerrors:' + url, (errorCount ? errorCount + 1 : 1), 60 * 60);
+
                 Logger.warn(
-                    `External webhook returned status ${response.status}`,
+                    `External webhook ${url} returned status ${response.status}`,
                     'EXTERNAL_WEBHOOK'
                 );
             }
         } catch (error: unknown) {
             const err = error as {message?: string};
+
             Logger.error(
                 `Failed to send external webhook: ${err.message || 'Unknown error'}`,
                 'EXTERNAL_WEBHOOK'
