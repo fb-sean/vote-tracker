@@ -57,7 +57,7 @@ export async function handleSetupBot(ctx: Context, setupId: string) {
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
-    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'bot', null)));
+    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'bot')));
 }
 
 export async function handleSetupServer(ctx: Context, setupId: string) {
@@ -80,7 +80,7 @@ export async function handleSetupGame(ctx: Context, setupId: string) {
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
-    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'game', null)));
+    return ctx.update(buildPayload(buildEntityIdStep(setupId, 'game')));
 }
 
 export async function handleSetupCancel(ctx: Context, setupId: string) {
@@ -100,51 +100,7 @@ export async function handleSetupBack(ctx: Context, setupId: string) {
     }
 
     if (state.current_step === 0) {
-        return ctx.update({
-            components: [
-                {
-                    type: ComponentType.TextDisplay,
-                    content: '# Setup Vote Tracking',
-                },
-                {
-                    type: ComponentType.TextDisplay,
-                    content: 'Choose what you want to track votes for:',
-                },
-                {
-                    type: ComponentType.Separator,
-                    spacing: 1,
-                },
-                {
-                    type: ComponentType.ActionRow,
-                    components: [
-                        {
-                            type: ComponentType.Button,
-                            style: 1,
-                            label: 'Bot',
-                            custom_id: `setup_bot_${setupId}`,
-                        },
-                        {
-                            type: ComponentType.Button,
-                            style: 1,
-                            label: 'Server',
-                            custom_id: `setup_server_${setupId}`,
-                        },
-                    ],
-                },
-                {
-                    type: ComponentType.ActionRow,
-                    components: [
-                        {
-                            type: ComponentType.Button,
-                            style: 4,
-                            label: 'Cancel',
-                            custom_id: `setup_cancel_${setupId}`,
-                        },
-                    ],
-                },
-            ],
-            flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
-        });
+        return ctx.update(buildPayload(buildEntitySelectionStep(setupId)));
     }
 
     const previous = await previousStep(setupId);
@@ -559,60 +515,11 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
     const step = state.current_step;
 
     if (step === 0) {
-        return ctx.update(buildPayload({
-            components: [
-                {
-                    type: ComponentType.TextDisplay,
-                    content: '# Setup Vote Tracking',
-                },
-                {
-                    type: ComponentType.TextDisplay,
-                    content: 'Choose what you want to track votes for:',
-                },
-                {
-                    type: ComponentType.Separator,
-                    spacing: 1,
-                },
-                {
-                    type: ComponentType.ActionRow,
-                    components: [
-                        {
-                            type: ComponentType.Button,
-                            style: 1,
-                            label: 'Bot',
-                            custom_id: `setup_bot_${setupId}`,
-                        },
-                        {
-                            type: ComponentType.Button,
-                            style: 1,
-                            label: 'Server',
-                            custom_id: `setup_server_${setupId}`,
-                        },
-                        // {
-                        //     type: ComponentType.Button,
-                        //     style: 1,
-                        //     label: 'Game',
-                        //     custom_id: `setup_game_${setupId}`,
-                        // },
-                    ],
-                },
-                {
-                    type: ComponentType.ActionRow,
-                    components: [
-                        {
-                            type: ComponentType.Button,
-                            style: 4,
-                            label: 'Cancel',
-                            custom_id: `setup_cancel_${setupId}`,
-                        },
-                    ],
-                },
-            ],
-        }));
+        return ctx.update(buildPayload(buildEntitySelectionStep(setupId)));
     }
 
     if (step === 1) {
-        return ctx.update(buildPayload(buildEntityIdStep(setupId, (state.entity_type || 'bot') as 'bot' | 'server' | 'game', state.entity_id)));
+        return ctx.update(buildPayload(buildEntityIdStep(setupId, state.entity_type!)));
     }
 
     if (step === 2) {

@@ -3,7 +3,7 @@ import {ButtonStyle, ComponentType, MessageFlags, RESTPostAPIChannelMessageJSONB
 import {createEditState, getSetupState, type TSetupState, updateSetupState} from "@Utils/SetupManager";
 import {
     buildChannelAndWebhookStep,
-    buildEntityIdStep,
+    buildEntityIdStep, buildEntitySelectionStep,
     buildMessagesStep,
     buildRewardsStep,
 } from "@Utils/SetupComponents";
@@ -35,50 +35,7 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
     const step = state.current_step;
 
     if (step === 0) {
-        return ctx.update(buildPayload({
-            components: [
-                {
-                    type: ComponentType.TextDisplay,
-                    content: '# Edit Vote Tracking',
-                },
-                {
-                    type: ComponentType.TextDisplay,
-                    content: 'Choose what you want to track votes for:',
-                },
-                {
-                    type: ComponentType.Separator,
-                    spacing: 1,
-                },
-                {
-                    type: ComponentType.ActionRow,
-                    components: [
-                        {
-                            type: ComponentType.Button,
-                            style: 1,
-                            label: 'Bot',
-                            custom_id: `setup_bot_${setupId}`,
-                        },
-                        {
-                            type: ComponentType.Button,
-                            style: 1,
-                            label: 'Server',
-                            custom_id: `setup_server_${setupId}`,
-                        },
-                    ],
-                },
-                {
-                    type: ComponentType.ActionRow,
-                    components: [
-                        {
-                            type: ComponentType.Button,
-                            style: 4,
-                            label: 'Cancel',
-                            custom_id: `setup_cancel_${setupId}`,
-                        },
-                    ],
-                },
-            ],
-        }));
+        return ctx.update(buildPayload(buildEntitySelectionStep(setupId)));
     }
 
     if (step === 1) {
@@ -119,7 +76,6 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
             },
         ];
 
-        // Add Enable/Disable button based on current state
         if (isDisabled) {
             firstActionRow.splice(1, 0, {
                 type: ComponentType.Button,
@@ -157,7 +113,6 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
             },
         ];
 
-        // If enabled (not disabled), show platform buttons
         if (!isDisabled) {
             components.push({
                 type: ComponentType.TextDisplay,
@@ -235,91 +190,6 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
     }
 
     return ctx.reply({content: 'Invalid step.'});
-}
-
-export async function handleListBack(ctx: Context, setupId: string) {
-    const state = await getSetupState(setupId);
-    if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.', flags: MessageFlags.Ephemeral});
-    }
-
-    if (state.editing_id && state.current_step <= 2) {
-        return ctx.reply({content: 'Cannot go back further. The entity type and ID are already set.', flags: MessageFlags.Ephemeral});
-    }
-
-    if (state.current_step === 1) {
-        return ctx.update({
-            components: [
-                {
-                    type: ComponentType.TextDisplay,
-                    content: '# Edit Vote Tracking',
-                },
-                {
-                    type: ComponentType.TextDisplay,
-                    content: 'Choose what you want to track votes for:',
-                },
-                {
-                    type: ComponentType.Separator,
-                    spacing: 1,
-                },
-                {
-                    type: ComponentType.ActionRow,
-                    components: [
-                        {
-                            type: ComponentType.Button,
-                            style: 1,
-                            label: 'Bot',
-                            custom_id: `setup_bot_${setupId}`,
-                        },
-                        {
-                            type: ComponentType.Button,
-                            style: 1,
-                            label: 'Server',
-                            custom_id: `setup_server_${setupId}`,
-                        },
-                    ],
-                },
-                {
-                    type: ComponentType.ActionRow,
-                    components: [
-                        {
-                            type: ComponentType.Button,
-                            style: 4,
-                            label: 'Cancel',
-                            custom_id: `setup_cancel_${setupId}`,
-                        },
-                    ],
-                },
-            ],
-            flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
-        });
-    }
-
-    const previous = await updateSetupState(setupId, {current_step: state.current_step - 1});
-    if (!previous) {
-        return ctx.reply({content: 'Cannot go back further.'});
-    }
-
-    // Import and call the refreshCurrentStep function (avoid circular reference)
-    return refreshCurrentStep(ctx, setupId, previous);
-}
-
-export async function handleListNext(ctx: Context, setupId: string) {
-    const state = await getSetupState(setupId);
-    if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.'});
-    }
-
-    if (!state.entity_id) {
-        return ctx.reply({content: 'Please enter your bot or server ID first.'});
-    }
-
-    const next = await updateSetupState(setupId, {current_step: state.current_step + 1});
-    if (!next) {
-        return ctx.reply({content: 'Cannot proceed further.'});
-    }
-
-    return refreshCurrentStep(ctx, setupId, next);
 }
 
 export async function handleListDump(ctx: Context, setupId: string) {
@@ -438,7 +308,7 @@ export async function handleListDeleteConfirm(ctx: Context, setupId: string) {
             },
             {
                 type: ComponentType.Container,
-                accent_color: 5763719, // Blue color
+                accent_color: 5763719,
                 components: [
                     {
                         type: ComponentType.TextDisplay,
