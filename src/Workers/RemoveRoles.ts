@@ -18,8 +18,6 @@ export default class RemoveRolesWorker implements TWorker {
         const startTime = Date.now();
 
         try {
-            Logger.info(`Removing role ${data.role_id} from ${data.user_id}`, 'REMOVE_ROLES');
-
             await this.removeRoleWithRateLimit(data.guild_id, data.user_id, data.role_id);
 
             await TemporaryRoleModel.deleteOne({

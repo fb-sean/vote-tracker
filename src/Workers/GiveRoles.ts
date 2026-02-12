@@ -19,8 +19,6 @@ export default class GiveRolesWorker implements TWorker {
         const startTime = Date.now();
 
         try {
-            Logger.info(`Processing roles for ${data.user_id}`, 'GIVE_ROLES');
-
             const settings = data.settings;
             if (!settings) {
                 Logger.warn(`Settings not found for ${data.server_id}`, 'GIVE_ROLES');

@@ -19,8 +19,6 @@ export default class ComputeVoteWorker implements TWorker {
         const startTime = Date.now();
 
         try {
-            Logger.info(`Processing vote for ${data.user_id} from ${data.platform}`, 'COMPUTE_VOTE');
-
             const settings = await SettingsModel.find({entity_id: data.entity_id, entity_type: data.entity_type, disabled: false});
             for (const setting of settings) {
                 if (setting.disabled) {

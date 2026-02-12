@@ -16,8 +16,6 @@ export default class SendExternalWebhookWorker implements TWorker {
         const startTime = Date.now();
 
         try {
-            Logger.info(`Sending external webhook for ${data.user_id} from ${data.platform}`, 'EXTERNAL_WEBHOOK');
-
             const settings = data.settings;
             if (!settings) {
                 Logger.warn(`Settings not found for ${data.entity_id}`, 'EXTERNAL_WEBHOOK');

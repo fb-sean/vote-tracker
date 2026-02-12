@@ -20,8 +20,6 @@ export default class SendMessageWorker implements TWorker {
         let d: any = null;
 
         try {
-            Logger.info(`Sending message for ${data.user_id} from ${data.platform}`, 'SEND_MESSAGE');
-
             const settings = data.settings;
             if (!settings) {
                 Logger.warn(`Settings not found for ${data.server_id}`, 'SEND_MESSAGE');
