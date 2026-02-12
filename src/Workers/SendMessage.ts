@@ -69,6 +69,31 @@ export default class SendMessageWorker implements TWorker {
         }
     }
 
+    private platformUrl(platform: ISendMessagePayload): string {
+        const platformMapping = {
+            // legacy
+            'topgg': {
+                'bot': 'https://top.gg/bot/' + platform.entity_id,
+                'server': 'https://top.gg/server/' + platform.entity_id,
+                'game': 'https://top.gg/roblox/game/' + platform.entity_id,
+            },
+            'dbl': {
+                'bot': 'https://discordbotlist.com/bots/' + platform.entity_id,
+                'server': 'https://discordbotlist.com/servers/' + platform.entity_id,
+            },
+            'discords': {
+                'bot': 'https://discordbotlist.com/bots/' + platform.entity_id,
+                'server': 'https://discordbotlist.com/servers/' + platform.entity_id,
+            }
+        };
+
+        platformMapping['Top.gg'] = platformMapping['topgg'];
+        platformMapping['DiscordBotList.com'] = platformMapping['dbl'];
+        platformMapping['Discords.com/bot'] = platformMapping['discords'];
+
+        return (platformMapping[platform.platform]?.[platform.entity_type] || 'https://top.gg') + '?ref=votes';
+    }
+
     private parseMessage(messageRaw: string, payload: ISendMessagePayload): Record<string, unknown> {
         const placeholders: IMessagePlaceholders = {
             'user.mention': `<@${payload.user_id}>`,
@@ -84,6 +109,7 @@ export default class SendMessageWorker implements TWorker {
             'votes.streak.best': payload.streak.best,
             'votes.streak.last': payload.streak.last,
             'platform': payload.platform,
+            'platform.url': this.platformUrl(payload),
             'entity.type': payload.entity_type,
             'entity.id': payload.entity_id,
         };
@@ -118,6 +144,7 @@ export default class SendMessageWorker implements TWorker {
 
             if (parsed.components && !parsed.content && !parsed.embeds) {
                 const flags = parsed.flags || 0;
+
                 if (!(flags & (1 << 15))) {
                     parsed.flags = flags | (1 << 15);
                 }
@@ -136,6 +163,7 @@ export default class SendMessageWorker implements TWorker {
 
         for (const [key, value] of Object.entries(placeholders)) {
             const placeholder = `{${key}}`;
+
             result = result.replaceAll(placeholder, String(value));
         }
 
@@ -189,7 +217,9 @@ export default class SendMessageWorker implements TWorker {
 
             if (discordError.code === 50001 || discordError.code === 50013 || discordError.code === 10003) {
                 Logger.warn(`No permissions for channel ${channelId}, caching failure`, 'SEND_MESSAGE');
+
                 await Redis.getInstance().set(permCacheKey, 'true', this.PERMISSION_CACHE_TTL);
+
                 return;
             }
 

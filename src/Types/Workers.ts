@@ -55,9 +55,10 @@ export interface IMessagePlaceholders {
     'votes.streak.current': number;
     'votes.streak.best': number;
     'votes.streak.last': number;
+    'platform': string;
+    'platform.url': string;
     'entity.type': string;
     'entity.id': string;
-    'platform': string;
 }
 
 export interface IGiveRolesPayload {

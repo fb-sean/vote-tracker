@@ -483,7 +483,8 @@ export function buildMessagesStep(setupId: string, state: TSetupState): RESTPost
                     '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
                     '- {entity.type} - "bot" or "server"\n' +
                     '- {entity.id} - 813913649633951764\n' +
-                    '- {platform} - top.gg, etc.\n'
+                    '- {platform} - top.gg, etc.\n' +
+                    '- {platform.url} - ex. https://top.gg/bot/813913649633951764\n'
             },
             {
                 type: ComponentType.TextDisplay,
@@ -575,7 +576,8 @@ export function buildFirstVoteMessageModal(setupId: string, currentValue: string
                     '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
                     '- {entity.type} - "bot" or "server"\n' +
                     '- {entity.id} - 813913649633951764\n' +
-                    '- {platform} - top.gg, etc.\n'
+                    '- {platform} - top.gg, etc.\n' +
+                    '- {platform.url} - ex. https://top.gg/bot/813913649633951764'
             },
             {
                 type: ComponentType.TextDisplay,
@@ -625,7 +627,8 @@ export function buildVoteMessageModal(setupId: string, currentValue: string): AP
                     '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
                     '- {entity.type} - "bot" or "server"\n' +
                     '- {entity.id} - 813913649633951764\n' +
-                    '- {platform} - top.gg, etc.\n'
+                    '- {platform} - top.gg, etc.\n' +
+                    '- {platform.url} - ex. https://top.gg/bot/813913649633951764'
             },
             {
                 type: ComponentType.TextDisplay,
