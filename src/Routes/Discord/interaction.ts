@@ -161,6 +161,7 @@ export default class InteractionRoute implements TRoute {
                     .catch(async (e) => {
                         Logger.error(`Error in autocomplete for ${command.constructor.name}`, 'AUTOCOMPLETE');
                         console.log(e);
+
                         return ctx.autocomplete([]);
                     });
             }

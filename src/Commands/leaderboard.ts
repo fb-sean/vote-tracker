@@ -16,7 +16,6 @@ import SettingsModel from "@Schemas/Settings";
 
 type LeaderboardSort = 'votes' | 'streak' | 'best_streak';
 
-// Components v2 types from discord-api-types
 type MessageComponent = APITextDisplayComponent | APIContainerComponent | APISeparatorComponent;
 
 interface LeaderboardResponse extends RESTPostAPIChannelMessageJSONBody {
@@ -46,7 +45,6 @@ function buildLeaderboardComponents(
         },
     ];
 
-    // Sort info card
     const sortNames = {
         votes: 'Total Votes',
         streak: 'Current Streak',
@@ -74,7 +72,6 @@ function buildLeaderboardComponents(
         spacing: 1,
     });
 
-    // Top 3 podium
     if (topUsers.length >= 3) {
         const gold = topUsers[0];
         const silver = topUsers[1];
@@ -82,7 +79,7 @@ function buildLeaderboardComponents(
 
         components.push({
             type: ComponentType.Container,
-            accent_color: 3158063, // Gold-ish
+            accent_color: 3158063,
             components: [
                 {
                     type: ComponentType.TextDisplay,
@@ -90,9 +87,10 @@ function buildLeaderboardComponents(
                 },
             ],
         });
+
         components.push({
             type: ComponentType.Container,
-            accent_color: 11264767, // Silver-ish
+            accent_color: 11264767,
             components: [
                 {
                     type: ComponentType.TextDisplay,
@@ -100,9 +98,10 @@ function buildLeaderboardComponents(
                 },
             ],
         });
+
         components.push({
             type: ComponentType.Container,
-            accent_color: 9935630, // Bronze-ish
+            accent_color: 9935630,
             components: [
                 {
                     type: ComponentType.TextDisplay,
@@ -111,7 +110,6 @@ function buildLeaderboardComponents(
             ],
         });
 
-        // Remaining users (4th onwards)
         if (topUsers.length > 3) {
             components.push({
                 type: ComponentType.Separator,
@@ -134,7 +132,6 @@ function buildLeaderboardComponents(
             }
         }
     } else if (topUsers.length > 0) {
-        // Less than 3 users, show normally
         for (let i = 0; i < Math.min(topUsers.length, 10); i++) {
             const user = topUsers[i];
             const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `**#${i + 1}**`;
@@ -145,7 +142,6 @@ function buildLeaderboardComponents(
         }
     }
 
-    // Show user's rank if not in top 25
     const userRank = sortedUsers.findIndex(u => u.userId === currentUserId);
     if (userRank >= 25) {
         components.push({
@@ -268,7 +264,6 @@ export default class LeaderboardCommand implements Command {
         const sort: LeaderboardSort = additional?.sort || 'votes';
 
         try {
-            // Get enabled settings for this server
             const settings = await SettingsModel.find({
                 server_id: serverId,
                 disabled: false,
@@ -281,7 +276,6 @@ export default class LeaderboardCommand implements Command {
                 });
             }
 
-            // Filter by entity if specified
             const entityIds = entityId
                 ? settings.filter(s => s.entity_id === entityId).map(s => s.entity_id)
                 : settings.map(s => s.entity_id);
@@ -308,7 +302,6 @@ export default class LeaderboardCommand implements Command {
                 } as LeaderboardResponse);
             }
 
-            // Get all votes for these entities in this server
             const votes = await VoteModel.find({
                 server_id: serverId,
                 entity_id: {$in: entityIds},
@@ -322,7 +315,6 @@ export default class LeaderboardCommand implements Command {
                 });
             }
 
-            // Calculate streaks and aggregate data
             const userStats = new Map<string, LeaderboardEntry>();
 
             for (const vote of votes) {
@@ -341,28 +333,24 @@ export default class LeaderboardCommand implements Command {
                 stat.lastVote = vote.createdAt!;
             }
 
-            // Calculate streaks for each user
             for (const [userId, stat] of userStats) {
                 const userVotes = votes.filter(v => v.user_id === userId).sort((a, b) =>
                     new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
                 );
 
-                // Calculate current streak
                 let currentStreak = 0;
                 let streakCheckTime = Date.now();
-                const streakWindow = 48 * 60 * 60 * 1000; // 48 hours
+                const streakWindow = 48 * 60 * 60 * 1000;
 
-                // Check from most recent backwards
                 for (let i = userVotes.length - 1; i >= 0; i--) {
                     const vote = userVotes[i];
                     const voteTime = new Date(vote.createdAt).getTime();
 
-                    // If this vote is outside the streak window, stop
                     if (streakCheckTime - voteTime > streakWindow) {
-                        // Check if the next vote (chronologically) would continue the streak
                         if (i < userVotes.length - 1) {
                             const nextVote = userVotes[i + 1];
                             const nextVoteTime = new Date(nextVote.createdAt).getTime();
+
                             if (nextVoteTime - voteTime > streakWindow) {
                                 break;
                             }
@@ -373,13 +361,11 @@ export default class LeaderboardCommand implements Command {
 
                     currentStreak++;
 
-                    // Move the "streakCheckTime" back to this vote time for checking chain
                     streakCheckTime = voteTime;
                 }
 
                 stat.streak = currentStreak;
 
-                // Calculate best streak (longest consecutive chain within 48h windows)
                 let bestStreak = 1;
                 let currentChain = 1;
 
@@ -399,18 +385,16 @@ export default class LeaderboardCommand implements Command {
                 stat.bestStreak = Math.max(bestStreak, currentChain);
             }
 
-            // Sort based on selected option
             const sortedUsers = Array.from(userStats.values()).sort((a, b) => {
                 if (sort === 'votes') return b.count - a.count;
                 if (sort === 'streak') return b.streak - a.streak;
                 if (sort === 'best_streak') return b.bestStreak - b.bestStreak;
+
                 return 0;
             });
 
-            // Get top 25
             const topUsers = sortedUsers.slice(0, 25);
 
-            // Build entity name
             const entityName = entityId
                 ? settings.find(s => s.entity_id === entityId)?.entity_type === 'bot'
                     ? `<@${entityId}>`
@@ -425,6 +409,7 @@ export default class LeaderboardCommand implements Command {
             });
         } catch (error) {
             console.error('Error in /leaderboard command:', error);
+
             return ctx.reply({
                 components: [
                     {
@@ -447,7 +432,6 @@ export default class LeaderboardCommand implements Command {
         }
     }
 
-    // Autocomplete handler for entity option
     async autocomplete(ctx: Context, additional?: Record<string, any>) {
         if (!ctx.isInGuild) {
             return ctx.autocomplete([]);
@@ -456,7 +440,6 @@ export default class LeaderboardCommand implements Command {
         const serverId = ctx.interaction.guild_id!;
 
         try {
-            // Get enabled settings for this server
             const settings = await SettingsModel.find({
                 server_id: serverId,
                 disabled: false,
@@ -471,7 +454,7 @@ export default class LeaderboardCommand implements Command {
                 if (setting.entity_type === 'bot') {
                     name = `Bot: ${entityId}`;
                 } else if (setting.entity_type === 'server') {
-                    name = `Server: ${entityId}`;
+                    name = `This Server`;
                 } else {
                     name = `Game: ${entityId}`;
                 }
@@ -482,6 +465,7 @@ export default class LeaderboardCommand implements Command {
             return ctx.autocomplete(choices.slice(0, 25));
         } catch (error) {
             console.error('Error in leaderboard autocomplete:', error);
+
             return ctx.autocomplete([]);
         }
     }
