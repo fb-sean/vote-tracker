@@ -14,7 +14,7 @@ export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMes
         components: [
             {
                 type: ComponentType.Container,
-                accent_color: 0x616ee3,
+                accent_color: 6387427,
                 components: [
                     {
                         type: ComponentType.Section,
@@ -85,7 +85,7 @@ export function buildUnsetupConnectionsStep(setupId: string, connections: TopggC
         components: [
             {
                 type: ComponentType.Container,
-                accent_color: 0x616ee3,
+                accent_color: 6387427,
                 components: [
                     {
                         type: ComponentType.Section,
@@ -338,8 +338,7 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
                                 type: ComponentType.Button,
                                 style: ButtonStyle.Success,
                                 label: 'Set External Webhook',
-                                custom_id: `setup_enter_webhook_${setupId}`,
-                                disabled: !!state.external_webhook_url,
+                                custom_id: `setup_enter_webhook_${setupId}`
                             },
                         ],
                     }
@@ -465,6 +464,7 @@ export function buildMessagesStep(setupId: string, state: TSetupState): RESTPost
                     '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
                     '- {entity.type} - "bot" or "server"\n' +
                     '- {entity.id} - 813913649633951764\n' +
+                    '- {new.line} - a new line, like \\n\n' +
                     '- {platform} - top.gg, etc.\n' +
                     '- {platform.url} - ex. https://top.gg/bot/813913649633951764\n'
             },
@@ -558,6 +558,7 @@ export function buildFirstVoteMessageModal(setupId: string, currentValue: string
                     '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
                     '- {entity.type} - "bot" or "server"\n' +
                     '- {entity.id} - 813913649633951764\n' +
+                    '- {new.line} - a new line, like \\n\n' +
                     '- {platform} - top.gg, etc.\n' +
                     '- {platform.url} - ex. https://top.gg/bot/813913649633951764'
             },
@@ -609,6 +610,7 @@ export function buildVoteMessageModal(setupId: string, currentValue: string): AP
                     '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
                     '- {entity.type} - "bot" or "server"\n' +
                     '- {entity.id} - 813913649633951764\n' +
+                    '- {new.line} - a new line, like \\n\n' +
                     '- {platform} - top.gg, etc.\n' +
                     '- {platform.url} - ex. https://top.gg/bot/813913649633951764'
             },

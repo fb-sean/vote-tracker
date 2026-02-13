@@ -38,7 +38,7 @@ export function errorComponent(title: string, text: string = 'Error...'): IConte
                     },
                     {
                         type: ComponentType.TextDisplay,
-                        content: 'Need help? Join our support server: <discord.gg/ZVERh35>'
+                        content: 'Need help? Join our support server: https://discord.gg/ZVERh35'
                     }
                 ]
             }
@@ -85,7 +85,7 @@ export function infoComponent(title: string, text: string = 'Success!', customBr
         components: [
             {
                 type: ComponentType.Container,
-                accent_color: 0x616ee3,
+                accent_color: 6387427,
                 components: [
                     {
                         type: ComponentType.Section,

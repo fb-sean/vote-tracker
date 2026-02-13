@@ -177,8 +177,14 @@ export async function saveSetupToDatabase(setupId: string): Promise<{ success: b
         }
 
         state.messages = [
-            {type: 'first-vote', payload: '{user.mention} has voted for the first time! 🎉'},
-            {type: 'vote', payload: '{user.mention} has voted! Total votes: {votes.count.all}'},
+            {
+                type: 'first-vote',
+                payload: '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted for the first time! 🎉\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]'
+            },
+            {
+                type: 'vote',
+                payload: '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted again with a {votes.streak.current} streak and {votes.count.month} votes this month! 🔥\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]'
+            },
         ];
     }
 

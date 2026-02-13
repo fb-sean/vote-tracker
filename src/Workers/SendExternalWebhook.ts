@@ -86,6 +86,7 @@ export default class SendExternalWebhookWorker implements TWorker {
                 url: url
             }, {
                 headers: {
+                    'auth': process.env.PROXY_WORKER_TOKEN,
                     'Content-Type': 'application/json',
                     'User-Agent': 'Votes/1.0',
                 },
@@ -103,9 +104,10 @@ export default class SendExternalWebhookWorker implements TWorker {
             const err = error as { message?: string };
 
             Logger.error(
-                `Failed to send external webhook: ${err.message || 'Unknown error'}`,
+                `Failed to send external webhook: ${err.message || err}`,
                 'EXTERNAL_WEBHOOK'
             );
+            console.log(err);
         }
     }
 }

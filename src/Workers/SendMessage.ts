@@ -1,7 +1,7 @@
 import {TWorker, IWorkerPayloadData, EWorkerJobs} from "@Types/RedisQueue";
 import SettingsModel from "@Schemas/Settings";
 import {DiscordClient} from "@API/DiscordClient";
-import {Routes} from "discord-api-types/v10";
+import {MessageFlags, Routes} from "discord-api-types/v10";
 import Redis from "@API/RedisCache";
 import Logger from "@Utils/Logger";
 import type {ISendMessagePayload, IMessagePlaceholders} from "@Types/Workers";
@@ -71,23 +71,24 @@ export default class SendMessageWorker implements TWorker {
         const platformMapping = {
             // legacy
             'topgg': {
-                'bot': 'https://top.gg/bot/' + platform.entity_id,
-                'server': 'https://top.gg/server/' + platform.entity_id,
-                'game': 'https://top.gg/roblox/game/' + platform.entity_id,
+                'bot': 'https://top.gg/bot/' + platform.entity_id + '/vote',
+                'server': 'https://top.gg/server/' + platform.entity_id + '/vote',
+                'game': 'https://top.gg/roblox/game/' + platform.entity_id + '/vote',
             },
             'dbl': {
-                'bot': 'https://discordbotlist.com/bots/' + platform.entity_id,
-                'server': 'https://discordbotlist.com/servers/' + platform.entity_id,
+                'bot': 'https://discordbotlist.com/bots/' + platform.entity_id + '/upvote',
+                'server': 'https://discordbotlist.com/servers/' + platform.entity_id + '/upvote',
             },
             'discords': {
-                'bot': 'https://discordbotlist.com/bots/' + platform.entity_id,
-                'server': 'https://discordbotlist.com/servers/' + platform.entity_id,
+                'bot': 'https://discordbotlist.com/bots/' + platform.entity_id + '/upvote',
+                'server': 'https://discordbotlist.com/servers/' + platform.entity_id + '/upvote',
             }
         };
 
         platformMapping['Top.gg'] = platformMapping['topgg'];
         platformMapping['DiscordBotList.com'] = platformMapping['dbl'];
         platformMapping['Discords.com/bot'] = platformMapping['discords'];
+        platformMapping['Discords.com'] = platformMapping['discords'];
 
         return (platformMapping[platform.platform]?.[platform.entity_type] || 'https://top.gg') + '?ref=votes';
     }
@@ -108,6 +109,7 @@ export default class SendMessageWorker implements TWorker {
             'votes.streak.last': payload.streak.last,
             'platform': payload.platform,
             'platform.url': this.platformUrl(payload),
+            'new.line': '\n',
             'entity.type': payload.entity_type,
             'entity.id': payload.entity_id,
         };
@@ -116,23 +118,9 @@ export default class SendMessageWorker implements TWorker {
             const parsed = JSON.parse(this.replacePlaceholders(messageRaw, placeholders));
 
             if (Array.isArray(parsed)) {
-                let content = '';
-                const components: unknown[] = [];
-
-                for (const item of parsed) {
-                    if (item.type === 10 && item.content) {
-                        content = item.content as string;
-                    } else if (item.type === 1 && item.components) {
-                        components.push(...item.components);
-                    } else if (item.type === 2) {
-                        components.push(item);
-                    }
-                }
-
                 return {
-                    content: this.replacePlaceholders(content, placeholders),
-                    components: components.length > 0 ? components : undefined,
-                    flags: content === '' ? 1 << 15 : undefined,
+                    components: parsed,
+                    flags: MessageFlags.SuppressNotifications | MessageFlags.IsComponentsV2,
                 };
             }
 
@@ -143,8 +131,8 @@ export default class SendMessageWorker implements TWorker {
             if (parsed.components && !parsed.content && !parsed.embeds) {
                 const flags = parsed.flags || 0;
 
-                if (!(flags & (1 << 15))) {
-                    parsed.flags = flags | (1 << 15);
+                if (!(flags & MessageFlags.IsComponentsV2)) {
+                    parsed.flags = flags | MessageFlags.IsComponentsV2;
                 }
             }
 
@@ -164,6 +152,8 @@ export default class SendMessageWorker implements TWorker {
 
             result = result.replaceAll(placeholder, String(value));
         }
+
+        result.replaceAll('\\n', '\n');
 
         return result;
     }

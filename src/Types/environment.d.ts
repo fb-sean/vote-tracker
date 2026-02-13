@@ -19,7 +19,7 @@ declare global {
             DISCORD_CLIENT_TOKEN: string;
             DISCORD_AUTH_CALLBACK_URL: string;
 
-            PROXY_PASSWORD: string;
+            PROXY_WORKER_TOKEN: string;
 
             TOP_GG_TOKEN: string;
         }

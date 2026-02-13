@@ -35,7 +35,7 @@ export default class WebhookDiscordsRoute implements TRoute {
             user_id: req.body.user,
             entity_id: settings.entity_id,
             entity_type: settings.entity_type,
-            platform: 'Discords.com/bot',
+            platform: 'Discords.com',
         };
 
         Logger.info(`Received ${mappedData.type} from ${mappedData.user_id} for ${mappedData.entity_type} ${mappedData.entity_id}`, 'Discords');

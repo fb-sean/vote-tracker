@@ -59,6 +59,7 @@ export interface IMessagePlaceholders {
     'platform.url': string;
     'entity.type': string;
     'entity.id': string;
+    'new.line': string;
 }
 
 export interface IGiveRolesPayload {

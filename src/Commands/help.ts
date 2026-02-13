@@ -73,7 +73,7 @@ export default class HelpCommand implements Command {
 
         components.push({
             type: ComponentType.TextDisplay,
-            content: 'Need help? Join our support server: <discord.gg/ZVERh35>',
+            content: 'Need help? Join our support server: https://discord.gg/ZVERh35',
         });
 
         return ctx.reply({
