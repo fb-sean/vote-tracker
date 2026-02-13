@@ -1,16 +1,13 @@
 import {TWorker, IWorkerPayloadData, EWorkerJobs} from "@Types/RedisQueue";
-import SettingsModel from "@Schemas/Settings";
 import Logger from "@Utils/Logger";
 import type {ISendExternalWebhookPayload} from "@Types/Workers";
-import {ProxyAgent} from "undici";
 import Redis from "@API/RedisCache";
+import axios from "axios";
 
 export default class SendExternalWebhookWorker implements TWorker {
     jobName = EWorkerJobs.SendExternalWebhook;
     maxPerSecond = 30;
     maxDuration = 1000;
-
-    private proxyAgent: ProxyAgent | null = null;
 
     async execute(payload: IWorkerPayloadData): Promise<void> {
         const data = payload as unknown as ISendExternalWebhookPayload;
@@ -84,71 +81,31 @@ export default class SendExternalWebhookWorker implements TWorker {
                 return;
             }
 
-            // const dispatcher = this.getProxyAgent();
-            const fetchOptions: RequestInit = {
-                method: 'POST',
+            const response = await axios.post('https://http-proxy-worker.discordbots.xyz', {
+                payload: payload,
+                url: url
+            }, {
                 headers: {
                     'Content-Type': 'application/json',
-                    'User-Agent': 'VoteTracker/1.0',
+                    'User-Agent': 'Votes/1.0',
                 },
-                body: JSON.stringify(payload),
-            };
+            });
 
-            // if (dispatcher) {
-            //     (fetchOptions as {dispatcher: unknown}).dispatcher = dispatcher;
-            // }
-
-            const response = await fetch(url, fetchOptions);
-
-            if (response.status >= 400) {
+            if (!response.data.ok) {
                 await Redis.getInstance().set('vt:externalwebhookerrors:' + url, (errorCount ? errorCount + 1 : 1), 60 * 60);
 
                 Logger.warn(
-                    `External webhook ${url} returned status ${response.status}`,
+                    `External webhook ${url} returned status ${response.data.error} (${response.data.details})`,
                     'EXTERNAL_WEBHOOK'
                 );
             }
         } catch (error: unknown) {
-            const err = error as {message?: string};
+            const err = error as { message?: string };
 
             Logger.error(
                 `Failed to send external webhook: ${err.message || 'Unknown error'}`,
                 'EXTERNAL_WEBHOOK'
             );
-        }
-    }
-
-    private getProxyAgent(): ProxyAgent | null {
-        if (this.proxyAgent) {
-            return this.proxyAgent;
-        }
-
-        const proxyHost = process.env.PROXY_HOST;
-        const proxyPort = process.env.PROXY_PORT;
-        const proxyUsername = process.env.PROXY_USERNAME;
-        const proxyPassword = process.env.PROXY_PASSWORD;
-
-        if (!proxyHost || !proxyPort) {
-            return null;
-        }
-
-        try {
-            let proxyUrl = `http://`;
-
-            if (proxyUsername && proxyPassword) {
-                proxyUrl += `${encodeURIComponent(proxyUsername)}:${encodeURIComponent(proxyPassword)}@`;
-            }
-
-            proxyUrl += `${proxyHost}:${proxyPort}`;
-
-            this.proxyAgent = new ProxyAgent(proxyUrl);
-
-            Logger.info(`Using proxy: ${proxyHost}:${proxyPort}`, 'EXTERNAL_WEBHOOK');
-
-            return this.proxyAgent;
-        } catch (error) {
-            Logger.error(`Failed to create proxy agent: ${error}`, 'EXTERNAL_WEBHOOK');
-            return null;
         }
     }
 }
