@@ -1,4 +1,4 @@
-# Vote-Tracker Coding Standards
+# Votes Coding Standards
 
 ## Project Overview
 Discord Vote Tracker Bot - TypeScript application tracking votes for Discord bots/servers.

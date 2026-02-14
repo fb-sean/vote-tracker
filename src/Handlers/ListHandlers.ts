@@ -8,7 +8,7 @@ import {
     updateSetupState
 } from "@Utils/SetupManager";
 import {
-    buildChannelAndWebhookStep,
+    buildChannelAndWebhookStep, buildCompleteStep,
     buildEntityIdStep, buildEntitySelectionStep,
     buildMessagesStep,
     buildRewardsStep,
@@ -63,138 +63,7 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
     }
 
     if (step === 5) {
-        const isDisabled = state.disable;
-        const statusText = isDisabled ? '🔴 **Status:** Disabled\n\nThis setup is currently disabled and will not track votes.' : '✅ **Status:** Enabled\n\nThis setup is active and tracking votes.';
-        const statusColor = isDisabled ? 15548997 : 5763719; // Red for disabled, blue for enabled
-        const entityType = state.entity_type || 'bot';
-        const showDiscordBotList = entityType === 'bot' || entityType === 'game';
-
-        const firstActionRow: any[] = [
-            {
-                type: ComponentType.Button,
-                style: ButtonStyle.Secondary,
-                label: 'Dump Settings',
-                custom_id: `list_dump_${setupId}`,
-            },
-            {
-                type: ComponentType.Button,
-                style: ButtonStyle.Danger,
-                label: 'Delete Setup',
-                custom_id: `list_delete_${setupId}`,
-            },
-        ];
-
-        if (isDisabled) {
-            firstActionRow.splice(1, 0, {
-                type: ComponentType.Button,
-                style: ButtonStyle.Success,
-                label: 'Enable Setup',
-                custom_id: `list_toggle_enable_${setupId}`,
-            });
-        } else {
-            firstActionRow.splice(1, 0, {
-                type: ComponentType.Button,
-                style: ButtonStyle.Danger,
-                label: 'Disable Setup',
-                custom_id: `list_toggle_disable_${setupId}`,
-            });
-        }
-
-        const components: any[] = [
-            {
-                type: ComponentType.TextDisplay,
-                content: '# Review Changes',
-            },
-            {
-                type: ComponentType.Container,
-                accent_color: statusColor,
-                components: [
-                    {
-                        type: ComponentType.TextDisplay,
-                        content: `${statusText}\n\n**Type:** ${state.entity_type === 'bot' ? 'Bot' : state.entity_type === 'game' ? 'Game' : 'Server'}\n**Entity ID:** ${state.entity_id}\n${state.channel_id ? `**Logging Channel:** <#${state.channel_id}>\n` : ''}${state.external_webhook_url ? '**External Webhook:** Set\n' : ''}${state.rewards.length > 0 ? `**Reward Roles:** ${state.rewards.length}\n` : ''}${state.messages.length > 0 ? `**Messages:** ${state.messages.length} configured` : '**Messages:** Defaults'}`,
-                    },
-                ],
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-        ];
-
-        if (!isDisabled) {
-            components.push({
-                type: ComponentType.TextDisplay,
-                content: '## Platform Setup',
-            });
-            components.push({
-                type: ComponentType.TextDisplay,
-                content: 'Click on a platform below to view webhook setup instructions:',
-            });
-            components.push({
-                type: ComponentType.Separator,
-                spacing: 1,
-            });
-            components.push({
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'top.gg',
-                        emoji: {name: '🔗'},
-                        custom_id: `setup_platform_topgg_${setupId}`,
-                    },
-                    ...(showDiscordBotList ? [{
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'discordbotlist.com',
-                        emoji: {name: '🔗'},
-                        custom_id: `setup_platform_discordbotlist_${setupId}`,
-                    } as const] : []),
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'discords.com',
-                        emoji: {name: '🔗'},
-                        custom_id: `setup_platform_discordscom_${setupId}`,
-                    },
-                ],
-            });
-            components.push({
-                type: ComponentType.Separator,
-                spacing: 1,
-            });
-        }
-
-        components.push({
-            type: ComponentType.TextDisplay,
-            content: isDisabled
-                ? 'Click "Enable Setup" to activate this vote tracking. It will validate that no other active setup is using the same entity ID.'
-                : 'Click "Save Changes" to update your setup. The webhook URL and auth token remain unchanged.',
-        });
-        components.push({
-            type: ComponentType.ActionRow,
-            components: firstActionRow,
-        });
-        components.push({
-            type: ComponentType.ActionRow,
-            components: [
-                {
-                    type: ComponentType.Button,
-                    style: isDisabled ? ButtonStyle.Success : ButtonStyle.Primary,
-                    label: isDisabled ? 'Enable & Save' : 'Save Changes',
-                    custom_id: `setup_finish_${setupId}`,
-                },
-                {
-                    type: ComponentType.Button,
-                    style: ButtonStyle.Secondary,
-                    label: 'Cancel',
-                    custom_id: `setup_cancel_${setupId}`,
-                },
-            ],
-        });
-
-        return ctx.update(buildPayload({components}));
+        return ctx.update(buildPayload(buildCompleteStep(setupId, state)));
     }
 
     return ctx.reply({content: 'Invalid step.'});
@@ -216,7 +85,7 @@ export async function handleListDump(ctx: Context, setupId: string) {
         exported_at: new Date().toISOString(),
     };
 
-    const fileName = `vote-tracker-backup-${state.entity_type}-${state.entity_id}-${Date.now()}.json`;
+    const fileName = `votes-backup-${state.entity_type}-${state.entity_id}-${Date.now()}.json`;
     const fileContent = Buffer.from(JSON.stringify(jsonData, null, 2), 'utf-8');
 
     return ctx.reply({

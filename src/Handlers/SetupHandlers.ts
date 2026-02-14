@@ -161,7 +161,7 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
         }
 
         const authToken = generateKey();
-        const updated = await updateSetupState(setupId, {auth_token: authToken});
+        const updated = await updateSetupState(setupId, {auth_token: authToken, current_step: state.current_step + 1});
         if (!updated) {
             return ctx.reply(errorComponent('Votes - Setup Wizard', 'Updating the session failed. Please start a new setup.'));
         }

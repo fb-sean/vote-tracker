@@ -87,6 +87,10 @@ export function buildEntitySelectionStep(setupId: string, hasServerEntity: boole
                         ],
                     },
                     {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    {
                         type: ComponentType.ActionRow,
                         components: [
                             {
@@ -241,11 +245,6 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server' 
                                 label: entityType === 'bot' ? 'Choose bot' : 'Enter ID',
                                 custom_id: `setup_enter_entityid_${setupId}`,
                             },
-                        ],
-                    },
-                    {
-                        type: ComponentType.ActionRow,
-                        components: [
                             {
                                 type: ComponentType.Button,
                                 style: ButtonStyle.Secondary,
@@ -376,6 +375,18 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
                         ],
                     },
                     {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Test Channel',
+                                custom_id: `setup_test_channel_${setupId}`,
+                                disabled: !state.channel_id,
+                            },
+                        ],
+                    },
+                    {
                         type: ComponentType.Section,
                         accessory: {
                             type: ComponentType.Button,
@@ -399,26 +410,6 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
                         components: [
                             {
                                 type: ComponentType.Button,
-                                style: ButtonStyle.Secondary,
-                                label: 'Test Channel',
-                                custom_id: `setup_test_channel_${setupId}`,
-                                disabled: !state.channel_id,
-                            },
-                            ...(isEditing ? [
-                                {
-                                    type: ComponentType.Button,
-                                    style: ButtonStyle.Secondary,
-                                    label: 'Dump Settings',
-                                    custom_id: `list_dump_${setupId}`,
-                                }
-                            ] : []) as APIComponentInMessageActionRow[]
-                        ],
-                    },
-                    {
-                        type: ComponentType.ActionRow,
-                        components: [
-                            {
-                                type: ComponentType.Button,
                                 style: ButtonStyle.Primary,
                                 label: 'Next',
                                 custom_id: `setup_next_${setupId}`,
@@ -435,6 +426,14 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
                                 label: 'Cancel',
                                 custom_id: `setup_cancel_${setupId}`,
                             },
+                            ...(isEditing ? [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Secondary,
+                                    label: 'Dump Settings',
+                                    custom_id: `list_dump_${setupId}`,
+                                }
+                            ] : []) as APIComponentInMessageActionRow[]
                         ],
                     },
                 ]
@@ -591,19 +590,6 @@ export function buildMessagesStep(setupId: string, state: TSetupState): RESTPost
                         type: ComponentType.Separator,
                         spacing: 1,
                     },
-                    ...(isEditing ? [
-                        {
-                            type: ComponentType.ActionRow,
-                            components: [
-                                {
-                                    type: ComponentType.Button,
-                                    style: ButtonStyle.Secondary,
-                                    label: 'Dump Settings',
-                                    custom_id: `list_dump_${setupId}`,
-                                }
-                            ],
-                        },
-                    ] : []) as APIComponentInContainer[],
                     {
                         type: ComponentType.ActionRow,
                         components: [
@@ -625,6 +611,14 @@ export function buildMessagesStep(setupId: string, state: TSetupState): RESTPost
                                 label: 'Cancel',
                                 custom_id: `setup_cancel_${setupId}`,
                             },
+                            ...(isEditing ? [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Secondary,
+                                    label: 'Dump Settings',
+                                    custom_id: `list_dump_${setupId}`,
+                                }
+                            ] : []) as APIComponentInMessageActionRow[],
                         ],
                     },
                 ]
@@ -805,19 +799,6 @@ export function buildRewardsStep(setupId: string, state: TSetupState): RESTPostA
                         type: ComponentType.Separator,
                         spacing: 1,
                     },
-                    ...(isEditing ? [
-                        {
-                            type: ComponentType.ActionRow,
-                            components: [
-                                {
-                                    type: ComponentType.Button,
-                                    style: ButtonStyle.Secondary,
-                                    label: 'Dump Settings',
-                                    custom_id: `list_dump_${setupId}`,
-                                }
-                            ],
-                        },
-                    ] : []) as APIComponentInContainer[],
                     {
                         type: ComponentType.ActionRow,
                         components: [
@@ -839,6 +820,14 @@ export function buildRewardsStep(setupId: string, state: TSetupState): RESTPostA
                                 label: 'Cancel',
                                 custom_id: `setup_cancel_${setupId}`,
                             },
+                            ...(isEditing ? [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Secondary,
+                                    label: 'Dump Settings',
+                                    custom_id: `list_dump_${setupId}`,
+                                }
+                            ] : []) as APIComponentInMessageActionRow[],
                         ],
                     },
                 ]
@@ -894,42 +883,55 @@ export function buildAddRewardModal(setupId: string): APIModalInteractionRespons
 }
 
 export function buildCompleteStep(setupId: string, state: TSetupState): RESTPostAPIChannelMessageJSONBody {
-    const configSummary = [
-        `**Type:** ${state.entity_type === 'bot' ? 'Bot' : state.entity_type === 'server' ? 'Server' : 'Game'}`,
-        `**Entity ID:** ${state.entity_id}`,
+    const isEditing = !!state.editing_id;
+    const isDisabled = state.disable;
+    let configSummary = [
+        `**Configuration for:** ${state.entity_type === 'bot' ? `<@${state.entity_id}>` : (state.entity_type === 'server' ? `this server` : `Roblox Game ${state.entity_id}`)}`,
         state.channel_id ? `**Logging Channel:** <#${state.channel_id}>` : '**Logging Channel:** Not set',
         state.external_webhook_url ? `**External Webhook:** Set` : '**External Webhook:** Not set',
         state.rewards.length > 0 ? `**Reward Roles:** ${state.rewards.length}` : '**Reward Roles:** None',
         state.messages.length > 0 ? `**Messages:** ${state.messages.length} configured` : '**Messages:** Defaults',
+
     ].join('\n');
 
+    if (isEditing) {
+        configSummary = (
+            (
+                isDisabled
+                    ? '**Status:** 🔴 Disabled'
+                    : '**Status:** ✅ Enabled'
+            )
+            + '\n' + configSummary
+        );
+    }
+
     const entityType = state.entity_type || 'bot';
-    const showDiscordBotList = entityType === 'bot' || entityType === 'game';
 
     const lists: APIComponentInMessageActionRow[] = [];
     if (entityType === 'bot' || entityType === 'server' || entityType === 'game') {
         lists.push({
             type: ComponentType.Button,
-            style: ButtonStyle.Primary,
+            style: ButtonStyle.Secondary,
             label: 'Top.gg',
-            emoji: {name: '🔗'},
+            emoji: {name: 'botlisttopgg', id: '1472359122232934460'},
             custom_id: `setup_platform_topgg_${setupId}`,
         });
     }
+
     if (entityType === 'bot' || entityType === 'server') {
         lists.push({
             type: ComponentType.Button,
-            style: ButtonStyle.Primary,
+            style: ButtonStyle.Secondary,
             label: 'DiscordBotList.com',
-            emoji: {name: '🔗'},
+            emoji: {name: 'botlistdbl', id: '1472359096454877340'},
             custom_id: `setup_platform_discordbotlist_${setupId}`,
         });
 
         lists.push({
             type: ComponentType.Button,
-            style: ButtonStyle.Primary,
+            style: ButtonStyle.Secondary,
             label: 'Discords.com',
-            emoji: {name: '🔗'},
+            emoji: {name: 'botlistdiscords', id: '1472359137479229466'},
             custom_id: `setup_platform_discordscom_${setupId}`,
         });
     }
@@ -937,63 +939,123 @@ export function buildCompleteStep(setupId: string, state: TSetupState): RESTPost
     return {
         components: [
             {
-                type: ComponentType.TextDisplay,
-                content: '# Setup Complete! 🎉',
-            },
-            {
                 type: ComponentType.Container,
-                accent_color: 5763719,
+                accent_color: 6387427,
                 components: [
+                    {
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Thumbnail,
+                            media: {
+                                url: BrightImages.ThumbsUp
+                            }
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: '### Votes - Setup Wizard\n-# Platform Integration'
+                            },
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: 'Just one last step: Review your configuration, make sure everything is set up the way you like it, and choose the platform you’d like to integrate "Votes" with. You can connect multiple platforms if you want.'
+                            }
+                        ]
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
                     {
                         type: ComponentType.TextDisplay,
-                        content: `## Configuration Summary\n${configSummary}`,
-                    },
-                ],
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: '## Choose Your Platform',
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: 'Select a voting platform to connect your webhook. Click on a platform to see detailed instructions.',
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.ActionRow,
-                components: [
-                    ...lists,
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Link,
-                        label: 'Need a different platform?',
-                        url: 'https://discord.gg/ZVERh35',
-                    },
-                ],
-            },
-            {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Success,
-                        label: 'Finish Setup',
-                        custom_id: `setup_finish_${setupId}`,
+                        content: configSummary,
                     },
                     {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Danger,
-                        label: 'Cancel',
-                        custom_id: `setup_cancel_${setupId}`,
+                        type: ComponentType.Separator,
+                        spacing: 1,
                     },
-                ],
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '## Choose Your Platform',
+                    },
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: 'Select a voting platform to connect your webhook. Click on a platform to see detailed instructions.',
+                    },
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            ...lists,
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Link,
+                                label: 'Need a different platform?',
+                                url: 'https://discord.gg/ZVERh35',
+                            },
+                        ],
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    ...(isEditing ? [
+                        {
+                            type: ComponentType.TextDisplay,
+                            content: '### Danger Zone',
+                        },
+                        {
+                            type: ComponentType.ActionRow,
+                            components: [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Danger,
+                                    label: (isDisabled ? 'Enable' : 'Disable') + ' Setup',
+                                    custom_id: `list_toggle_${isDisabled ? 'enable' : 'disable'}_${setupId}`,
+                                },
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Danger,
+                                    label: 'Delete Setup',
+                                    custom_id: `list_delete_${setupId}`,
+                                },
+                            ],
+                        },
+                        {
+                            type: ComponentType.Separator,
+                            spacing: 1,
+                        },
+                    ] : []) as APIComponentInContainer[],
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Success,
+                                label: (isEditing ? (isDisabled ? 'Enable & Save' : 'Save Changes') : 'Finish Setup'),
+                                custom_id: `setup_finish_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Back',
+                                custom_id: `setup_back_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Danger,
+                                label: 'Cancel',
+                                custom_id: `setup_cancel_${setupId}`,
+                            },
+                            ...(isEditing ? [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Secondary,
+                                    label: 'Dump Settings',
+                                    custom_id: `list_dump_${setupId}`,
+                                }
+                            ] : []) as APIComponentInMessageActionRow[],
+                        ],
+                    },
+                ]
             },
         ],
     };
