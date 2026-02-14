@@ -27,7 +27,7 @@ import {
     handleSetupSelectConnection,
     handleSetupServer,
     handleSetupTestChannel,
-    handleSetupUsePreFetchedId,
+    handleSetupUsePreFetchedId, handleSetupViewFirstVote, handleSetupViewVote,
     handleSetupVoteModal,
     handleSetupWebhookModal,
 } from "@Handlers/SetupHandlers";
@@ -240,13 +240,11 @@ export default class InteractionRoute implements TRoute {
                     break;
                 case 'view':
                     if (parts[2] === 'firstvote') {
-                        // @TODO.sattler: Edit this
-                        return handleSetupEditFirstVote(ctx, setupId);
+                        return handleSetupViewFirstVote(ctx, setupId);
                     }
 
                     if (parts[2] === 'vote') {
-                        // @TODO.sattler: Edit this
-                        return handleSetupEditVote(ctx, setupId);
+                        return handleSetupViewVote(ctx, setupId);
                     }
 
                     break;

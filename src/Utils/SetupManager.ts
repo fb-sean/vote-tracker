@@ -40,6 +40,9 @@ const SETUP_STEPS = [
     'complete'
 ] as const;
 
+export const defaultFirstVote = '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted for the first time! 🎉\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]';
+export const defaultVote = '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted again with a streak of **{votes.streak.current}** and **{votes.count.month}** votes this month in general! 🔥\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]';
+
 export async function createSetupState(serverId: string, userId: string): Promise<string> {
     const setupId = randomBytes(16).toString('hex');
 
@@ -123,9 +126,6 @@ export async function saveSetupToDatabase(setupId: string): Promise<{ success: b
     if (!state || !state.entity_type || !state.entity_id) {
         return {success: false};
     }
-
-    const defaultFirstVote = '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted for the first time! 🎉\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]';
-    const defaultVote = '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted again with a streak of **{votes.streak.current}** and **{votes.count.month}** votes this month in general! 🔥\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]';
 
     if (state.editing_id) {
         const existing = await SettingsModel.findById(state.editing_id);

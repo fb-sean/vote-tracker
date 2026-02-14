@@ -9,7 +9,7 @@ import {
 import {DiscordClient} from "@API/DiscordClient";
 import {
     checkForDuplicateEntityId,
-    countSetupsForServer,
+    countSetupsForServer, defaultFirstVote, defaultVote,
     deleteSetupState,
     getSetupState,
     nextStep,
@@ -246,6 +246,28 @@ export async function handleSetupTestChannel(ctx: Context, setupId: string) {
     } catch (error) {
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Failed to send test message. Please check bot permissions.'));
     }
+}
+
+export async function handleSetupViewFirstVote(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Setup session expired. Please start over.'));
+    }
+
+    const existingMessage = state.messages.find(m => m.type === 'first-vote');
+
+    return ctx.reply(infoComponent('Votes - Setup Wizard\n-# Messages', 'Current First Vote Message:\n```\n' + (existingMessage?.payload || defaultFirstVote) + '\n```'));
+}
+
+export async function handleSetupViewVote(ctx: Context, setupId: string) {
+    const state = await getSetupState(setupId);
+    if (!state) {
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Setup session expired. Please start over.'));
+    }
+
+    const existingMessage = state.messages.find(m => m.type === 'vote');
+
+    return ctx.reply(infoComponent('Votes - Setup Wizard\n-# Messages', 'Current Vote Message:\n```\n' + (existingMessage?.payload || defaultVote) + '\n```'));
 }
 
 export async function handleSetupEditFirstVote(ctx: Context, setupId: string) {
