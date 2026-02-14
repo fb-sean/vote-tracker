@@ -10,6 +10,7 @@ import Redis from "@API/RedisCache";
 import {EWorkerJobs} from "@Types/RedisQueue";
 import {DiscordClient} from "@API/DiscordClient";
 import {Routes} from "discord-api-types/v10";
+import {fetchAndSaveUserData} from "@Utils/Discord";
 
 export default class WebhookDBLRoute implements TRoute {
     method = 'POST';
@@ -42,7 +43,7 @@ export default class WebhookDBLRoute implements TRoute {
 
         Logger.info(`Received ${mappedData.type} from ${mappedData.user_id} for ${mappedData.entity_type} ${mappedData.entity_id}`, 'DBL');
 
-        await this.fetchAndSaveUserData(mappedData.user_id);
+        await fetchAndSaveUserData(mappedData.user_id);
 
         await RedisQueue.getInstance().addJob(EWorkerJobs.ComputeVote, {
             user_id: mappedData.user_id,
@@ -56,35 +57,5 @@ export default class WebhookDBLRoute implements TRoute {
 
         Logger.info(`Vote queued for processing`, 'DBL');
         return Response(res, {message: 'Vote received'});
-    }
-
-    private async fetchAndSaveUserData(userId: string): Promise<void> {
-        try {
-            const cacheKey = `discord:vt:user:${userId}`;
-            const cached = await Redis.getInstance().get<string>(cacheKey);
-
-            if (cached) {
-                return;
-            }
-
-            const bot = DiscordClient.getInstance();
-            const user = await bot.rest.get(Routes.user(userId)) as {username: string; global_name: string | null; avatar: string | null};
-
-            const avatar = user.avatar ? user.avatar.split('/').pop()?.split('.')[0] : null;
-
-            await UserDataModel.findOneAndUpdate(
-                {userId: userId},
-                {
-                    userId: userId,
-                    username: user.global_name || user.username,
-                    avatar: avatar || '',
-                },
-                {upsert: true}
-            );
-
-            await Redis.getInstance().set(cacheKey, 'true', 900);
-        } catch (error) {
-            Logger.error(`Failed to fetch user ${userId}: ${error}`, 'DBL');
-        }
     }
 }

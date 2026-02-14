@@ -1,6 +1,6 @@
 import type {TIncomingMessage, TRoute, TServerResponse} from "@Types/HttpClient";
 import {Context} from "@Utils/Context";
-import {APIInteraction, ComponentType, MessageFlags} from "discord-api-types/v10";
+import {APIInteraction, MessageFlags} from "discord-api-types/v10";
 import {DiscordClient} from "@API/DiscordClient";
 import Logger from "@Utils/Logger";
 import {
@@ -238,6 +238,18 @@ export default class InteractionRoute implements TRoute {
                     }
 
                     break;
+                case 'view':
+                    if (parts[2] === 'firstvote') {
+                        // @TODO.sattler: Edit this
+                        return handleSetupEditFirstVote(ctx, setupId);
+                    }
+
+                    if (parts[2] === 'vote') {
+                        // @TODO.sattler: Edit this
+                        return handleSetupEditVote(ctx, setupId);
+                    }
+
+                    break;
                 case 'edit':
                     if (parts[2] === 'firstvote') {
                         return handleSetupEditFirstVote(ctx, setupId);
@@ -308,7 +320,7 @@ export default class InteractionRoute implements TRoute {
         const getValue = (customId: string): string => {
             const component = components.find((c: any) => c.component?.custom_id === customId || c.components?.[0]?.custom_id === customId);
 
-            return component?.component?.value || component?.components?.[0]?.value || '';
+            return component?.component?.value || component?.components?.[0]?.value || (component?.component?.values ? component?.component?.values[0] : '') || '';
         };
 
         const getSelectValue = (customId: string): string => {

@@ -3,6 +3,7 @@ import {ButtonStyle, ComponentType} from "discord-api-types/v10";
 import Redis from "@API/RedisCache";
 import SettingsModel from "@Schemas/Settings";
 import TopggConnectionModel from "@Schemas/Integrations/Topgg";
+import {fetchAndSaveUserData} from "@Utils/Discord";
 
 export type TRewardRole = {
     role_id: string;
@@ -38,8 +39,6 @@ const SETUP_STEPS = [
     'rewards',
     'complete'
 ] as const;
-
-export type TSetupStep = typeof SETUP_STEPS[number];
 
 export async function createSetupState(serverId: string, userId: string): Promise<string> {
     const setupId = randomBytes(16).toString('hex');
@@ -125,6 +124,9 @@ export async function saveSetupToDatabase(setupId: string): Promise<{ success: b
         return {success: false};
     }
 
+    const defaultFirstVote = '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted for the first time! 🎉\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]';
+    const defaultVote = '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted again with a streak of **{votes.streak.current}** and **{votes.count.month}** votes this month in general! 🔥\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]';
+
     if (state.editing_id) {
         const existing = await SettingsModel.findById(state.editing_id);
         if (!existing) {
@@ -148,6 +150,22 @@ export async function saveSetupToDatabase(setupId: string): Promise<{ success: b
         existing.entity_type = state.entity_type;
         existing.channel_id = state.channel_id;
         existing.external_webhook_url = state.external_webhook_url;
+
+        if (!state.messages.some(r => r.type === 'first-vote')) {
+            state.messages.push({
+                type: 'first-vote',
+                payload: defaultFirstVote
+            });
+        }
+
+        if (!state.messages.some(r => r.type === 'vote')) {
+            state.messages.push({
+                type: 'vote',
+                payload: defaultVote
+            });
+        }
+
+
         existing.set('rewards', state.rewards);
         existing.set('messages', state.messages);
         existing.disabled = state.disable || false;
@@ -179,11 +197,11 @@ export async function saveSetupToDatabase(setupId: string): Promise<{ success: b
         state.messages = [
             {
                 type: 'first-vote',
-                payload: '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted for the first time! 🎉\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]'
+                payload: defaultFirstVote
             },
             {
                 type: 'vote',
-                payload: '[{"type":17,"accent_color":6387427,"spoiler":false,"components":[{"type":9,"accessory":{"type":11,"media":{"url":"https://cdn.discordapp.com/attachments/843258152802844703/1471207360650543227/bright-smile.png"},"description":null,"spoiler":false},"components":[{"type":10,"content":"Someone voted!"},{"type":10,"content":"**{user.username}** just voted again with a {votes.streak.current} streak and {votes.count.month} votes this month! 🔥\\n\\n-# You can vote again on **{platform}** once more in 12 hours."}]},{"type":14,"divider":true,"spacing":1},{"type":1,"components":[{"type":2,"style":5,"label":"Vote again!","emoji":null,"disabled":false,"url":"{platform.url}"}]}]}]'
+                payload: defaultVote
             },
         ];
     }
@@ -265,12 +283,17 @@ export async function getUnsetupConnections(userId: string) {
         entity_id: {$in: platformIds},
     }).distinct('entity_id');
 
-    return connections.filter(c => c.project_platform_id && !setupEntityIds.includes(c.project_platform_id));
-}
+    const filteredConnections = connections.filter(c => c.project_platform_id && !setupEntityIds.includes(c.project_platform_id));
+    for (const connection of filteredConnections) {
+        if (connection.project_type !== 'bot') continue;
 
-export async function shouldShowUnsetupConnections(userId: string): Promise<boolean> {
-    const unsetupConnections = await getUnsetupConnections(userId);
-    return unsetupConnections.length > 0;
+        const bot = await fetchAndSaveUserData(connection.project_platform_id!);
+        if (!bot) continue;
+
+        connection['bot_username'] = bot.username;
+    }
+
+    return filteredConnections;
 }
 
 export function buildSetupList(setups: any[], serverId: string) {

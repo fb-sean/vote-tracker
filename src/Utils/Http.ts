@@ -163,3 +163,95 @@ export function getIP(req: TIncomingMessage): string {
 
     return (Array.isArray(raw) ? raw[0] : raw).split(',')[0].trim();
 }
+
+export const blockedHostnames: string[] = [
+    // Discord ecosystem
+    'discord.com',
+    'discordapp.com',
+    'discord.gg',
+    'discord.media',
+    'discordcdn.com',
+    'media.discordapp.net',
+    'cdn.discordapp.com',
+
+    // Local / loopback / internal
+    'localhost',
+    'localhost.localdomain',
+    '0.0.0.0',
+    '127.0.0.1',
+    '::1',
+
+    // Cloud metadata endpoints (classic SSRF targets)
+    '169.254.169.254',
+    'metadata.google.internal',
+    'metadata.azure.internal',
+
+    // Slack
+    'slack.com',
+    'hooks.slack.com',
+
+    // Telegram
+    'api.telegram.org',
+    'telegram.org',
+
+    // Microsoft / Teams
+    'outlook.com',
+    'office.com',
+    'microsoft.com',
+    'teams.microsoft.com',
+
+    // Google APIs
+    'google.com',
+    'www.google.com',
+    'googleapis.com',
+    'webhook.site',
+
+    // GitHub / GitLab
+    'github.com',
+    'api.github.com',
+    'gitlab.com',
+
+    // Payment providers (defensive)
+    'paypal.com',
+    'api.paypal.com',
+    'stripe.com',
+    'api.stripe.com',
+
+    // Common webhook / automation platforms
+    'zapier.com',
+    'hooks.zapier.com',
+    'ifttt.com',
+    'maker.ifttt.com',
+    'n8n.io',
+    'pipedream.com',
+
+    // URL shorteners
+    'bit.ly',
+    'tinyurl.com',
+    't.co',
+    'goo.gl',
+    'cutt.ly',
+    'rb.gy',
+
+    // CDN / file sharing often abused
+    'dropbox.com',
+    'dl.dropboxusercontent.com',
+    'drive.google.com',
+    'mega.nz',
+    'wetransfer.com',
+
+    // Common tunneling / dev exposure
+    'ngrok.io',
+    'ngrok-free.app',
+    'trycloudflare.com',
+    'loca.lt',
+    'serveo.net',
+
+    // Social platforms (usually not valid webhook targets)
+    'facebook.com',
+    'instagram.com',
+    'twitter.com',
+    'x.com',
+    'tiktok.com',
+    'linkedin.com'
+];

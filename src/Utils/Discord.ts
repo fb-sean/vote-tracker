@@ -1,7 +1,10 @@
-import {APIInteraction, RESTGetAPIUserResult, RESTPostOAuth2AccessTokenResult} from "discord-api-types/v10";
+import {APIInteraction, RESTGetAPIUserResult, RESTPostOAuth2AccessTokenResult, Routes} from "discord-api-types/v10";
 import {URLSearchParams} from "url";
 import {isErrorResponse, TErrorResponse} from "@Types/Discord";
 import Logger from "@Utils/Logger";
+import Redis from "@API/RedisCache";
+import {DiscordClient} from "@API/DiscordClient";
+import UserDataModel from "@Schemas/UserData";
 
 export function buildAvatarUrl(userId: string, avatar: Nullable<string>): string {
     if (!avatar) { // @ts-ignore
@@ -17,6 +20,52 @@ export function isSnowflake(input: string): boolean {
 
 export function escapeMarkDown(text: string) {
     return text.replace(/[*_~|`]/g, '\$&');
+}
+
+export async function fetchAndSaveUserData(userId: string): Promise<Nullable<{
+    userId: string;
+    username: string;
+    avatar: string | null
+}>> {
+    try {
+        const cacheKey = `discord:vt:user:${userId}`;
+        const cached = await Redis.getInstance().get<{
+            userId: string;
+            username: string;
+            avatar: string | null
+        }>(cacheKey);
+
+        if (cached) {
+            return cached;
+        }
+
+        const user = await DiscordClient.getInstance().rest.get(Routes.user(userId)) as {
+            id: string;
+            username: string;
+            global_name: string | null;
+            avatar: string | null
+        };
+
+        const mappedUser = {
+            userId: user.id,
+            username: user.global_name || user.username,
+            avatar: user.avatar,
+        };
+
+        await UserDataModel.findOneAndUpdate(
+            {userId: userId},
+            mappedUser,
+            {upsert: true}
+        );
+
+        await Redis.getInstance().set(cacheKey, mappedUser, 900);
+
+        return mappedUser;
+    } catch (error) {
+        Logger.error(`Failed to fetch user ${userId}: ${error}`, 'Discord');
+
+        return null;
+    }
 }
 
 export async function fetchNewAccessToken(refreshToken: string): Promise<{

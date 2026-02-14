@@ -286,21 +286,6 @@ export default class ComputeVoteWorker implements TWorker {
         return !existingVote;
     }
 
-    private async getlast(payload: IComputeVotePayload): Promise<any> {
-        const last = await VoteModel
-            .findOne({
-                user_id: payload.user_id,
-                entity_id: payload.entity_id,
-                entity_type: payload.entity_type,
-                is_test: false,
-            })
-            .sort({createdAt: -1})
-            .skip(1)
-            .limit(1);
-
-        return last;
-    }
-
     private async getOrFetchUserData(payload: IComputeVotePayload): Promise<IUserData | null> {
         const userData = await UserDataModel.findOne({userId: payload.user_id});
 

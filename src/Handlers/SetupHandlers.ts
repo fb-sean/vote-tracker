@@ -1,6 +1,6 @@
 import {Context} from "@Utils/Context";
 import {
-    APIMessageChannelSelectInteractionData,
+    APIMessageChannelSelectInteractionData, APIModalSubmitInteraction, APIUserInteractionDataResolved,
     ComponentType,
     MessageFlags, RESTGetAPIChannelMessageResult,
     RESTPostAPIChannelMessageJSONBody,
@@ -8,6 +8,7 @@ import {
 } from "discord-api-types/v10";
 import {DiscordClient} from "@API/DiscordClient";
 import {
+    checkForDuplicateEntityId,
     countSetupsForServer,
     deleteSetupState,
     getSetupState,
@@ -39,6 +40,7 @@ import {generateKey} from "@Utils/Key";
 import {refreshCurrentStep as listRefreshCurrentStep} from "@Handlers/ListHandlers";
 import {errorComponent, infoComponent, successComponent} from "@Utils/Components";
 import {delay} from "bullmq";
+import {blockedHostnames} from "@Utils/Http";
 
 function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: number) {
     return {
@@ -100,7 +102,9 @@ export async function handleSetupBack(ctx: Context, setupId: string) {
     }
 
     if (state.current_step === 0) {
-        return ctx.update(buildPayload(buildEntitySelectionStep(setupId)));
+        const hasServerEntity = await checkForDuplicateEntityId(ctx.interaction.guild_id!);
+
+        return ctx.update(buildPayload(buildEntitySelectionStep(setupId, hasServerEntity)));
     }
 
     const previous = await previousStep(setupId);
@@ -203,9 +207,9 @@ export async function handleSetupUsePreFetchedId(ctx: Context, setupId: string) 
 
 export async function handleSetupChannelSelect(ctx: Context, setupId: string) {
     const interactionData = ctx.interaction.data as APIMessageChannelSelectInteractionData;
-    const selectedChannelId = interactionData.values?.[0];
+    let selectedChannelId: Nullable<string> = interactionData.values?.[0];
     if (!selectedChannelId) {
-        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Please select a channel to continue.'));
+        selectedChannelId = null;
     }
 
     const state = await updateSetupState(setupId, {channel_id: selectedChannelId});
@@ -352,6 +356,11 @@ export async function handleSetupEntityIdModal(ctx: Context, setupId: string, en
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'The ID cannot be empty.'));
     }
 
+    const resolved = (ctx.interaction.data as APIModalSubmitInteraction['data']).resolved;
+    if (resolved && resolved.users && !resolved.users[entityId].bot) {
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'The selected user is not a bot. Please select a bot instead.'));
+    }
+
     const state = await updateSetupState(setupId, {entity_id: entityId.trim(), current_step: 2});
     if (!state) {
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Setup session expired. Please start over.'));
@@ -363,7 +372,16 @@ export async function handleSetupEntityIdModal(ctx: Context, setupId: string, en
 export async function handleSetupWebhookModal(ctx: Context, setupId: string, webhookUrl: string) {
     if (webhookUrl && webhookUrl.trim().length > 0) {
         try {
-            new URL(webhookUrl.trim());
+            const url = new URL(webhookUrl.trim());
+
+            if (url.protocol !== 'https:') {
+                return ctx.reply(errorComponent('Votes - Setup Wizard', 'Webhook URL must use https.'));
+            }
+
+            const blockedHostname = blockedHostnames.find(hostname => url.hostname.includes(hostname));
+            if (blockedHostname) {
+                return ctx.reply(errorComponent('Votes - Setup Wizard', 'Webhook URL cannot use a blocked hostname. (' + blockedHostname + ')'));
+            }
         } catch {
             return ctx.reply(errorComponent('Votes - Setup Wizard', 'Invalid webhook URL format.'));
         }
@@ -385,29 +403,7 @@ export async function handleSetupFirstVoteModal(ctx: Context, setupId: string, m
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
-    let payload = message.trim();
-    const IsComponentsV2 = 1 << 15;
-
-    if (payload.startsWith('{') || payload.startsWith('[')) {
-        try {
-            const parsed = JSON.parse(payload);
-
-            if (Array.isArray(parsed)) {
-                payload = JSON.stringify({
-                    components: parsed,
-                    flags: IsComponentsV2,
-                });
-            } else if (parsed.components && !parsed.content && !parsed.embeds) {
-                const flags = parsed.flags || 0;
-                if (!(flags & IsComponentsV2)) {
-                    parsed.flags = flags | IsComponentsV2;
-                    payload = JSON.stringify(parsed);
-                }
-            }
-        } catch {
-        }
-    }
-
+    const payload = message.trim();
     const updatedMessages = state.messages.filter(m => m.type !== 'first-vote');
     if (payload.length > 0) {
         updatedMessages.push({
@@ -430,29 +426,7 @@ export async function handleSetupVoteModal(ctx: Context, setupId: string, messag
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
-    let payload = message.trim();
-    const IsComponentsV2 = 1 << 15;
-
-    if (payload.startsWith('{') || payload.startsWith('[')) {
-        try {
-            const parsed = JSON.parse(payload);
-
-            if (Array.isArray(parsed)) {
-                payload = JSON.stringify({
-                    components: parsed,
-                    flags: IsComponentsV2,
-                });
-            } else if (parsed.components && !parsed.content && !parsed.embeds) {
-                const flags = parsed.flags || 0;
-                if (!(flags & IsComponentsV2)) {
-                    parsed.flags = flags | IsComponentsV2;
-                    payload = JSON.stringify(parsed);
-                }
-            }
-        } catch {
-        }
-    }
-
+    const payload = message.trim();
     const updatedMessages = state.messages.filter(m => m.type !== 'vote');
     if (payload.length > 0) {
         updatedMessages.push({
@@ -515,7 +489,9 @@ async function refreshCurrentStep(ctx: Context, setupId: string, state: TSetupSt
     const step = state.current_step;
 
     if (step === 0) {
-        return ctx.update(buildPayload(buildEntitySelectionStep(setupId)));
+        const hasServerEntity = await checkForDuplicateEntityId(ctx.interaction.guild_id!);
+
+        return ctx.update(buildPayload(buildEntitySelectionStep(setupId, hasServerEntity)));
     }
 
     if (step === 1) {
@@ -598,7 +574,9 @@ export async function handleSetupSelectConnection(ctx: Context, setupId: string,
     }
 
     if (selectedValue === 'decline') {
-        return ctx.update(buildPayload(buildEntitySelectionStep(setupId)));
+        const hasServerEntity = await checkForDuplicateEntityId(ctx.interaction.guild_id!);
+
+        return ctx.update(buildPayload(buildEntitySelectionStep(setupId, hasServerEntity)));
     }
 
     const entityId = selectedValue.replace('conn_', '');

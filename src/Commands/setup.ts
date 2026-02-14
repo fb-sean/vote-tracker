@@ -1,7 +1,7 @@
 import {Context} from "@Utils/Context";
 import {Command} from "@Types/Discord";
 import {ApplicationIntegrationType, InteractionContextType, MessageFlags,} from "discord-api-types/v10";
-import {createSetupState, getUnsetupConnections} from "@Utils/SetupManager";
+import {checkForDuplicateEntityId, createSetupState, getUnsetupConnections} from "@Utils/SetupManager";
 import {buildEntitySelectionStep, buildUnsetupConnectionsStep} from "@Utils/SetupComponents";
 import {errorComponent, loadingComponent} from "@Utils/Components";
 
@@ -35,8 +35,10 @@ export default class SetupCommand implements Command {
             });
         }
 
+        const hasServerEntity = await checkForDuplicateEntityId(ctx.interaction.guild_id!);
+
         return ctx.editReply({
-            ...buildEntitySelectionStep(setupId),
+            ...buildEntitySelectionStep(setupId, hasServerEntity),
             flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
         });
     }

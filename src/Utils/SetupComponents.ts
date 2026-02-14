@@ -1,15 +1,37 @@
 import {
-    APIMessageTopLevelComponent,
+    APIComponentInContainer,
+    APIComponentInMessageActionRow,
     APIModalInteractionResponseCallbackData,
     ButtonStyle,
-    ComponentType, MessageFlags,
+    ComponentType,
     RESTPostAPIChannelMessageJSONBody
 } from "discord-api-types/v10";
 import {TSetupState} from "@Utils/SetupManager";
 import {TopggConnection} from "@Schemas/Integrations/Topgg";
 import {BrightImages} from "@Utils/BrightImages";
 
-export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMessageJSONBody {
+function msToReadable(ms) {
+    const weeks = Math.floor(ms / (7 * 24 * 60 * 60 * 1000));
+    const weeksMs = ms % (7 * 24 * 60 * 60 * 1000);
+
+    const days = Math.floor(weeksMs / (24 * 60 * 60 * 1000));
+    const daysMs = weeksMs % (24 * 60 * 60 * 1000);
+
+    const hours = Math.floor(daysMs / (60 * 60 * 1000));
+    const hoursMs = daysMs % (60 * 60 * 1000);
+
+    const minutes = Math.floor(hoursMs / (60 * 1000));
+
+    let result = "";
+    if (weeks) result += `${weeks} week${weeks > 1 ? 's' : ''} `;
+    if (days) result += `${days} day${days > 1 ? 's' : ''} `;
+    if (hours) result += `${hours} hour${hours > 1 ? 's' : ''} `;
+    if (minutes) result += `${minutes} minute${minutes > 1 ? 's' : ''}`;
+
+    return result.trim();
+}
+
+export function buildEntitySelectionStep(setupId: string, hasServerEntity: boolean = false): RESTPostAPIChannelMessageJSONBody {
     return {
         components: [
             {
@@ -53,6 +75,7 @@ export function buildEntitySelectionStep(setupId: string): RESTPostAPIChannelMes
                                 style: ButtonStyle.Primary,
                                 label: 'Server',
                                 custom_id: `setup_server_${setupId}`,
+                                disabled: hasServerEntity,
                             },
                             // Later
                             // {
@@ -117,15 +140,38 @@ export function buildUnsetupConnectionsStep(setupId: string, connections: TopggC
                                 type: ComponentType.StringSelect,
                                 custom_id: `setup_select_connection_${setupId}`,
                                 options: [
-                                    ...connections.map((conn, index) => ({
-                                        label: `Bot ID: ${conn.project_platform_id}`,
-                                        value: `conn_${conn.project_platform_id}`,
-                                        description: `Click to set up this bot`,
-                                    })),
+                                    ...connections.map((connection) => {
+                                        let label = '';
+                                        let description = '';
+
+                                        switch (connection.project_type) {
+                                            case 'bot':
+                                                label = connection['bot_username'] ? ('Bot: ' + connection['bot_username']) : `Bot ID: ${connection.project_platform_id}`;
+                                                description = 'Click to set up this bot';
+
+                                                break;
+                                            case 'server':
+                                                label = 'This Server';
+                                                description = 'Click to set up this server';
+
+                                                break;
+                                            case 'game':
+                                                label = 'Game ID: ' + connection.project_platform_id;
+                                                description = 'Click to set up this game';
+
+                                                break;
+                                        }
+
+                                        return {
+                                            label: label,
+                                            description: description,
+                                            value: `conn_${connection.project_platform_id}`,
+                                        };
+                                    }),
                                     {
                                         label: "No, I don't want to use this",
-                                        value: 'decline',
                                         description: 'Setup one manually.',
+                                        value: 'decline',
                                     }
                                 ],
                                 placeholder: 'Select a Top.gg connection to set up...',
@@ -154,7 +200,7 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server' 
         components: [
             {
                 type: ComponentType.Container,
-                accent_color: 15548997,
+                accent_color: 6387427,
                 components: [
                     {
                         type: ComponentType.Section,
@@ -172,16 +218,13 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server' 
                             {
                                 type: ComponentType.TextDisplay,
                                 content: (
-                                    entityType === 'server'
-                                        ? 'Enter the server ID you want to track votes for.'
+                                    entityType === 'bot'
+                                        ? 'Select the bot you want to track votes for.'
                                         : 'Enter the game ID you want to track votes for.'
                                 ) + '\n\n' + (
-                                    entityType === 'bot'
-                                        ? '## ⚠️ Important: Use your real Discord ID\nPlease enter your **actual Discord application ID** (for bots).\n\n**Do NOT** use the ID from the top.gg URL - those are different from your actual Discord IDs!'
-                                        : entityType === 'server'
-                                            ? '## ⚠️ Important: Use your real Discord ID\nPlease enter your **actual Discord server ID**.\n\n**Do NOT** use the ID from the top.gg URL - those are different from your actual Discord IDs!'
-                                            : '## ⚠️ Important: Use your Top.gg Game ID\nPlease enter the **Top.gg game ID** from the URL.\n\nExample: For `https://top.gg/roblox/games/796498829106180096`, use `796498829106180096`'
-                                )
+                                    entityType === 'game'
+                                        ? '## ⚠️ Important: Use your Top.gg Game ID\nPlease enter the **Top.gg game ID** from the URL.\n\nExample: For `https://top.gg/roblox/games/796498829106180096`, use `796498829106180096`'
+                                        : '')
                             },
                         ]
                     },
@@ -195,7 +238,7 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server' 
                             {
                                 type: ComponentType.Button,
                                 style: ButtonStyle.Primary,
-                                label: 'Enter ID',
+                                label: entityType === 'bot' ? 'Choose bot' : 'Enter ID',
                                 custom_id: `setup_enter_entityid_${setupId}`,
                             },
                         ],
@@ -225,13 +268,13 @@ export function buildEntityIdStep(setupId: string, entityType: 'bot' | 'server' 
 
 export function buildEntityIdModal(setupId: string, entityType: 'bot' | 'server' | 'game'): APIModalInteractionResponseCallbackData {
     const label = entityType === 'bot'
-        ? 'Your Bot ID'
+        ? 'Your Bot'
         : entityType === 'server'
             ? 'Your Server ID'
             : 'Your Game ID';
 
     const description = entityType === 'bot'
-        ? 'Enter your actual Discord application ID'
+        ? 'Enter your actual Discord application'
         : entityType === 'server'
             ? 'Enter your actual Discord server ID'
             : 'Enter the Top.gg game ID from the URL';
@@ -244,78 +287,83 @@ export function buildEntityIdModal(setupId: string, entityType: 'bot' | 'server'
         title: 'Enter your ID',
         custom_id: `setup_modal_entityid_${setupId}`,
         components: [
-            {
-                type: ComponentType.Label,
-                label: label,
-                description: description,
-                component: {
-                    type: ComponentType.TextInput,
-                    style: 1,
-                    custom_id: 'entity_id',
-                    placeholder: placeholder,
-                    required: true,
-                    max_length: 100,
-                },
-            },
+            entityType === 'bot'
+                ? {
+                    type: ComponentType.Label,
+                    label: label,
+                    description: description,
+                    component: {
+                        type: ComponentType.UserSelect,
+                        custom_id: 'entity_id',
+                        placeholder: placeholder,
+                        required: true,
+                        max_values: 1
+                    },
+                }
+                : {
+                    type: ComponentType.Label,
+                    label: label,
+                    description: description,
+                    component: {
+                        type: ComponentType.TextInput,
+                        style: 1,
+                        custom_id: 'entity_id',
+                        placeholder: placeholder,
+                        required: true,
+                        max_length: 100,
+                    },
+                }
         ],
     };
 }
 
 export function buildChannelAndWebhookStep(setupId: string, state: TSetupState): RESTPostAPIChannelMessageJSONBody {
-    const channelText = state.channel_id ? `✅ Channel set` : 'Select logging channel (optional)';
-    const webhookText = state.external_webhook_url ? '✅ External webhook set' : 'Set external webhook URL (optional)';
     const isEditing = !!state.editing_id;
-
-    const actionRowComponents = [
-        {
-            type: ComponentType.Button,
-            style: ButtonStyle.Primary,
-            label: 'Next',
-            custom_id: `setup_next_${setupId}`,
-        },
-        {
-            type: ComponentType.Button,
-            style: ButtonStyle.Secondary,
-            label: 'Back',
-            custom_id: `setup_back_${setupId}`,
-        },
-        {
-            type: ComponentType.Button,
-            style: ButtonStyle.Danger,
-            label: 'Cancel',
-            custom_id: `setup_cancel_${setupId}`,
-        },
-    ] as any;
-
-    if (isEditing) {
-        actionRowComponents.splice(2, 0, {
-            type: ComponentType.Button,
-            style: ButtonStyle.Secondary,
-            label: 'Dump JSON',
-            custom_id: `list_dump_${setupId}`,
-        });
-    }
 
     return {
         components: [
             {
-                type: ComponentType.TextDisplay,
-                content: `# ${isEditing ? 'Edit' : 'Setup'} Vote Tracking - Step 3/6`,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: 'Configure where votes should be logged. Both options are optional.',
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
                 type: ComponentType.Container,
+                accent_color: 6387427,
                 components: [
                     {
-                        type: ComponentType.TextDisplay,
-                        content: `${channelText}`,
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Thumbnail,
+                            media: {
+                                url: BrightImages.Thinking
+                            }
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: '### Votes - Setup Wizard\n-# Channel and Webhook configuration'
+                            },
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: 'Configure where votes should be logged or sent externally for your own integration. Both options are optional.',
+                            },
+                        ]
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    {
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Button,
+                            style: ButtonStyle.Secondary,
+                            label: 'Clear Channel',
+                            custom_id: `setup_select_channel_reset_${setupId}`,
+                            disabled: !state.channel_id
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: state.channel_id ? `✅ Channel set (<#${state.channel_id}>)` : 'Select a logging channel (optional)',
+                            },
+                        ]
                     },
                     {
                         type: ComponentType.ActionRow,
@@ -328,42 +376,69 @@ export function buildChannelAndWebhookStep(setupId: string, state: TSetupState):
                         ],
                     },
                     {
-                        type: ComponentType.TextDisplay,
-                        content: `${webhookText}`,
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Button,
+                            style: ButtonStyle.Secondary,
+                            label: 'Set Webhook',
+                            custom_id: `setup_enter_webhook_${setupId}`
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: state.external_webhook_url ? `✅ External webhook set\n> ||${state.external_webhook_url}||` : 'Set a external webhook URL (optional)',
+                            },
+                        ]
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
                     },
                     {
                         type: ComponentType.ActionRow,
                         components: [
                             {
                                 type: ComponentType.Button,
-                                style: ButtonStyle.Success,
-                                label: 'Set External Webhook',
-                                custom_id: `setup_enter_webhook_${setupId}`
+                                style: ButtonStyle.Secondary,
+                                label: 'Test Channel',
+                                custom_id: `setup_test_channel_${setupId}`,
+                                disabled: !state.channel_id,
+                            },
+                            ...(isEditing ? [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Secondary,
+                                    label: 'Dump Settings',
+                                    custom_id: `list_dump_${setupId}`,
+                                }
+                            ] : []) as APIComponentInMessageActionRow[]
+                        ],
+                    },
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Primary,
+                                label: 'Next',
+                                custom_id: `setup_next_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Back',
+                                custom_id: `setup_back_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Danger,
+                                label: 'Cancel',
+                                custom_id: `setup_cancel_${setupId}`,
                             },
                         ],
-                    }
-                ],
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Secondary,
-                        label: 'Test Channel',
-                        custom_id: `setup_test_channel_${setupId}`,
-                        disabled: !state.channel_id,
                     },
-                ],
-            },
-            {
-                type: ComponentType.ActionRow,
-                components: actionRowComponents,
-            },
+                ]
+            }
         ],
     };
 }
@@ -378,7 +453,7 @@ export function buildExternalWebhookModal(setupId: string): APIModalInteractionR
                 content: '**Webhook Payload Information**\n' +
                     'Your webhook will receive POST requests with vote data. All fields listed below are sent in the request body as JSON.\n' +
                     '**Required Fields**\n' +
-                    '• entity_type: "bot" or "server"\n• entity_id: Your bot/server ID\n• voter_id: ID of the user who voted\n• platform: Where the vote came from (top.gg, etc.)\n' +
+                    '• entity_type: "bot", "server" or "game"\n• entity_id: Your bot/server ID\n• voter_id: ID of the user who voted\n• platform: Where the vote came from (top.gg, etc.)\n' +
                     '**Optional Fields**\n' +
                     '• guild_id: Server ID (when available)\n• is_test: If its a test event\n• last_vote: UNIX timestamp\n• is_first_vote: If the user voted for the first time\n• count: {all, month, year, week}\n• streak: {best, current, last}\n\nAll optional fields may not always be present!',
             },
@@ -401,133 +476,159 @@ export function buildExternalWebhookModal(setupId: string): APIModalInteractionR
 export function buildMessagesStep(setupId: string, state: TSetupState): RESTPostAPIChannelMessageJSONBody {
     const firstVoteMessage = state.messages.find(m => m.type === 'first-vote');
     const voteMessage = state.messages.find(m => m.type === 'vote');
-
-    const firstVoteStatus = firstVoteMessage ? '✅ Configured' : 'Default';
-    const voteStatus = voteMessage ? '✅ Configured' : 'Default';
     const isEditing = !!state.editing_id;
-
-    const actionRowComponents = [
-        {
-            type: ComponentType.Button,
-            style: ButtonStyle.Primary,
-            label: 'Next',
-            custom_id: `setup_next_${setupId}`,
-        },
-        {
-            type: ComponentType.Button,
-            style: ButtonStyle.Secondary,
-            label: 'Back',
-            custom_id: `setup_back_${setupId}`,
-        },
-        {
-            type: ComponentType.Button,
-            style: ButtonStyle.Danger,
-            label: 'Cancel',
-            custom_id: `setup_cancel_${setupId}`,
-        },
-    ] as any;
-
-    if (isEditing) {
-        actionRowComponents.splice(2, 0, {
-            type: ComponentType.Button,
-            style: ButtonStyle.Secondary,
-            label: 'Dump JSON',
-            custom_id: `list_dump_${setupId}`,
-        });
-    }
 
     return {
         components: [
             {
-                type: ComponentType.TextDisplay,
-                content: `# ${isEditing ? 'Edit' : 'Setup'} Vote Tracking - Step 4/6`,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: 'Configure the messages sent when users vote. This supports full JSON payloads even with flags.',
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: '>>> 💡 Messages use Discord markdown.\n' +
-                    'Available variables:\n' +
-                    '- {user.mention} - <@813913649633951764>\n' +
-                    '- {user.username} - Votes\n' +
-                    '- {user.id} - 813913649633951764\n' +
-                    '- {user.avatar} - 0b58922d67bb06a5924898361a6ff0ff\n' +
-                    '- {user.avatar.animated} - ?animated=true\n' +
-                    '- {votes.count.all} - 1000\n' +
-                    '- {votes.count.month} - 500\n' +
-                    '- {votes.count.year} - 1000\n' +
-                    '- {votes.count.week} - 50\n' +
-                    '- {votes.streak.current} - 12\n' +
-                    '- {votes.streak.best} - 357\n' +
-                    '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
-                    '- {entity.type} - "bot" or "server"\n' +
-                    '- {entity.id} - 813913649633951764\n' +
-                    '- {new.line} - a new line, like \\n\n' +
-                    '- {platform} - top.gg, etc.\n' +
-                    '- {platform.url} - ex. https://top.gg/bot/813913649633951764\n'
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: '> 💡 The bot fully supports components and/or embeds in these messages. Provide the raw JSON payload as you would send to Discord\'s API. You can also use <https://discord.builders>',
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
                 type: ComponentType.Container,
+                accent_color: 6387427,
                 components: [
                     {
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Thumbnail,
+                            media: {
+                                url: BrightImages.Thinking
+                            }
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: '### Votes - Setup Wizard\n-# Messages'
+                            },
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: 'Configure the messages sent when users vote. Votes supports full JSON payloads created at https://discord.builders, or you can just use plain text with variables. Clear the custom messages to use the default messages.'
+                            },
+                        ]
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    {
                         type: ComponentType.TextDisplay,
-                        content: `🎉 First Vote Message - ${firstVoteStatus}`,
+                        content: '**💡 You can use full Discord markdown in your messages.**\n' +
+                            'Available variables:\n' +
+                            '- `{user.mention}` - <@813913649633951764>\n' +
+                            '- `{user.username}` - Votes\n' +
+                            '- `{user.id}` - 813913649633951764\n' +
+                            '- `{user.avatar}` - 0b58922d67bb06a5924898361a6ff0ff\n' +
+                            '- `{user.avatar.animated}` - ?animated=true\n' +
+                            '- `{votes.count.all}` - 1000\n' +
+                            '- `{votes.count.month}` - 500\n' +
+                            '- `{votes.count.year}` - 1000\n' +
+                            '- `{votes.count.week}` - 50\n' +
+                            '- `{votes.streak.current}` - 12\n' +
+                            '- `{votes.streak.best}` - 357\n' +
+                            '- `{votes.streak.last}` - 1770667266 (UNIX timestamp)\n' +
+                            '- `{entity.type}` - "bot", "server" or "game"\n' +
+                            '- `{entity.id}` - 813913649633951764\n' +
+                            '- `{new.line}` - a new line, like \\n\n' +
+                            '- `{platform}` - top.gg, etc.\n' +
+                            '- `{platform.url}` - ex. https://top.gg/bot/813913649633951764\n'
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    {
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Button,
+                            style: ButtonStyle.Secondary,
+                            label: 'Edit',
+                            custom_id: `setup_edit_firstvote_${setupId}`,
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: firstVoteMessage ? '✅ First Vote Message Configured' : 'Using **Default** First Vote Message',
+                            },
+                        ]
                     },
                     {
                         type: ComponentType.ActionRow,
                         components: [
                             {
                                 type: ComponentType.Button,
-                                style: ButtonStyle.Primary,
-                                label: 'Edit First Vote Message',
-                                custom_id: `setup_edit_firstvote_${setupId}`,
-                            },
+                                style: ButtonStyle.Secondary,
+                                label: 'View First Vote Message',
+                                custom_id: `setup_view_firstvote_${setupId}`,
+                                disabled: !firstVoteMessage,
+                            }
                         ],
                     },
-                ],
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.Container,
-                components: [
                     {
-                        type: ComponentType.TextDisplay,
-                        content: `📊 Vote Message - ${voteStatus}`,
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Button,
+                            style: ButtonStyle.Secondary,
+                            label: 'Edit',
+                            custom_id: `setup_edit_vote_${setupId}`,
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: voteMessage ? '✅ Vote Message Configured' : 'Using **Default** Vote Message',
+                            },
+                        ]
                     },
                     {
                         type: ComponentType.ActionRow,
                         components: [
                             {
                                 type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'View Vote Message',
+                                custom_id: `setup_view_vote_${setupId}`,
+                                disabled: !voteMessage,
+                            }
+                        ],
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    ...(isEditing ? [
+                        {
+                            type: ComponentType.ActionRow,
+                            components: [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Secondary,
+                                    label: 'Dump Settings',
+                                    custom_id: `list_dump_${setupId}`,
+                                }
+                            ],
+                        },
+                    ] : []) as APIComponentInContainer[],
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
                                 style: ButtonStyle.Primary,
-                                label: 'Edit Vote Message',
-                                custom_id: `setup_edit_vote_${setupId}`,
+                                label: 'Next',
+                                custom_id: `setup_next_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Back',
+                                custom_id: `setup_back_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Danger,
+                                label: 'Cancel',
+                                custom_id: `setup_cancel_${setupId}`,
                             },
                         ],
                     },
-                ],
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.ActionRow,
-                components: actionRowComponents,
-            },
+                ]
+            }
         ],
     };
 }
@@ -544,27 +645,27 @@ export function buildFirstVoteMessageModal(setupId: string, currentValue: string
             {
                 type: ComponentType.TextDisplay,
                 content: '**Available variables**\n' +
-                    '- {user.mention} - <@813913649633951764>\n' +
-                    '- {user.username} - Votes\n' +
-                    '- {user.id} - 813913649633951764\n' +
-                    '- {user.avatar} - 0b58922d67bb06a5924898361a6ff0ff\n' +
-                    '- {user.avatar.animated} - ?animated=true\n' +
-                    '- {votes.count.all} - 1000\n' +
-                    '- {votes.count.month} - 500\n' +
-                    '- {votes.count.year} - 1000\n' +
-                    '- {votes.count.week} - 50\n' +
-                    '- {votes.streak.current} - 12\n' +
-                    '- {votes.streak.best} - 357\n' +
-                    '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
-                    '- {entity.type} - "bot" or "server"\n' +
-                    '- {entity.id} - 813913649633951764\n' +
-                    '- {new.line} - a new line, like \\n\n' +
-                    '- {platform} - top.gg, etc.\n' +
-                    '- {platform.url} - ex. https://top.gg/bot/813913649633951764'
+                    '- `{user.mention}` - <@813913649633951764>\n' +
+                    '- `{user.username}` - Votes\n' +
+                    '- `{user.id}` - 813913649633951764\n' +
+                    '- `{user.avatar}` - 0b58922d67bb06a5924898361a6ff0ff\n' +
+                    '- `{user.avatar.animated}` - ?animated=true\n' +
+                    '- `{votes.count.all}` - 1000\n' +
+                    '- `{votes.count.month}` - 500\n' +
+                    '- `{votes.count.year}` - 1000\n' +
+                    '- `{votes.count.week}` - 50\n' +
+                    '- `{votes.streak.current}` - 12\n' +
+                    '- `{votes.streak.best}` - 357\n' +
+                    '- `{votes.streak.last}` - 1770667266 (UNIX timestamp)\n' +
+                    '- `{entity.type}` - "bot", "server" or "game"\n' +
+                    '- `{entity.id}` - 813913649633951764\n' +
+                    '- `{new.line}` - a new line, like \\n\n' +
+                    '- `{platform}` - top.gg, etc.\n' +
+                    '- `{platform.url}` - ex. https://top.gg/bot/813913649633951764'
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '> 💡 Supports Components v2 JSON payloads. Paste an array from discord.builders and it will be auto-wrapped with the correct flags!',
+                content: '> 💡 Supports Components v2 JSON payloads. Paste an array from discord.builders and it will be auto-wrapped!',
             },
             {
                 type: ComponentType.Label,
@@ -596,27 +697,27 @@ export function buildVoteMessageModal(setupId: string, currentValue: string): AP
             {
                 type: ComponentType.TextDisplay,
                 content: '**Available variables**\n' +
-                    '- {user.mention} - <@813913649633951764>\n' +
-                    '- {user.username} - Votes\n' +
-                    '- {user.id} - 813913649633951764\n' +
-                    '- {user.avatar} - 0b58922d67bb06a5924898361a6ff0ff\n' +
-                    '- {user.avatar.animated} - ?animated=true\n' +
-                    '- {votes.count.all} - 1000\n' +
-                    '- {votes.count.month} - 500\n' +
-                    '- {votes.count.year} - 1000\n' +
-                    '- {votes.count.week} - 50\n' +
-                    '- {votes.streak.current} - 12\n' +
-                    '- {votes.streak.best} - 357\n' +
-                    '- {votes.streak.last} - 1770667266 (UNIX timestamp)\n' +
-                    '- {entity.type} - "bot" or "server"\n' +
-                    '- {entity.id} - 813913649633951764\n' +
-                    '- {new.line} - a new line, like \\n\n' +
-                    '- {platform} - top.gg, etc.\n' +
-                    '- {platform.url} - ex. https://top.gg/bot/813913649633951764'
+                    '- `{user.mention}` - <@813913649633951764>\n' +
+                    '- `{user.username}` - Votes\n' +
+                    '- `{user.id}` - 813913649633951764\n' +
+                    '- `{user.avatar}` - 0b58922d67bb06a5924898361a6ff0ff\n' +
+                    '- `{user.avatar.animated}` - ?animated=true\n' +
+                    '- `{votes.count.all}` - 1000\n' +
+                    '- `{votes.count.month}` - 500\n' +
+                    '- `{votes.count.year}` - 1000\n' +
+                    '- `{votes.count.week}` - 50\n' +
+                    '- `{votes.streak.current}` - 12\n' +
+                    '- `{votes.streak.best}` - 357\n' +
+                    '- `{votes.streak.last}` - 1770667266 (UNIX timestamp)\n' +
+                    '- `{entity.type}` - "bot", "server" or "game"\n' +
+                    '- `{entity.id}` - 813913649633951764\n' +
+                    '- `{new.line}` - a new line, like \\n\n' +
+                    '- `{platform}` - top.gg, etc.\n' +
+                    '- `{platform.url}` - ex. https://top.gg/bot/813913649633951764'
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '> 💡 Supports Components v2 JSON payloads. Paste an array from discord.builders and it will be auto-wrapped with the correct flags!',
+                content: '> 💡 Supports Components v2 JSON payloads. Paste an array from discord.builders and it will be auto-wrapped!',
             },
             {
                 type: ComponentType.Label,
@@ -640,104 +741,110 @@ export function buildRewardsStep(setupId: string, state: TSetupState): RESTPostA
     const rewardsCount = state.rewards.length;
     const isEditing = !!state.editing_id;
 
-    const components: APIMessageTopLevelComponent[] = [
-        {
-            type: ComponentType.TextDisplay,
-            content: `# ${isEditing ? 'Edit' : 'Setup'} Vote Tracking - Step 5/6`,
-        },
-        {
-            type: ComponentType.TextDisplay,
-            content: `Configure reward roles (${rewardsCount}/25 added)`,
-        },
-        {
-            type: ComponentType.TextDisplay,
-            content: '> 💡 Users will receive these roles when voting. You can set minimum vote requirements.',
-        },
-        {
-            type: ComponentType.Separator,
-            spacing: 1,
-        },
-        {
-            type: ComponentType.ActionRow,
-            components: [
-                {
-                    type: ComponentType.Button,
-                    style: ButtonStyle.Success,
-                    label: 'Add Reward Role',
-                    custom_id: `setup_add_reward_${setupId}`,
-                    disabled: rewardsCount >= 25,
-                },
-            ],
-        },
-    ];
-
-    if (rewardsCount > 0) {
-        components.push({
-            type: ComponentType.TextDisplay,
-            content: `## Current Rewards (${rewardsCount})`,
-        });
-
-        for (let i = 0; i < state.rewards.length; i++) {
-            const r = state.rewards[i];
-            components.push({
-                type: ComponentType.Section,
+    return {
+        components: [
+            {
+                type: ComponentType.Container,
+                accent_color: 6387427,
                 components: [
                     {
-                        type: ComponentType.TextDisplay,
-                        content: `${i + 1}. <@&${r.role_id}>${r.min_votes > 0 ? ` (min ${r.min_votes} votes)` : ''}${r.duration_min > 0 ? ` (${r.duration_min} min)` : ''}`,
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Thumbnail,
+                            media: {
+                                url: rewardsCount >= 1 ? BrightImages.Clock : BrightImages.Thinking
+                            }
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: '### Votes - Setup Wizard\n-# Rewards\n' +
+                                    'Users will receive these roles when voting. You can set minimum vote requirements.'
+                            }
+                        ]
                     },
-                ],
-                accessory: {
-                    type: ComponentType.Button,
-                    style: ButtonStyle.Danger,
-                    label: 'Remove',
-                    custom_id: `setup_remove_reward_${setupId}_${i}`,
-                },
-            });
-        }
-    }
-
-    components.push({
-        type: ComponentType.Separator,
-        spacing: 1,
-    });
-
-    const actionRowComponents = [
-        {
-            type: ComponentType.Button,
-            style: ButtonStyle.Primary,
-            label: 'Next',
-            custom_id: `setup_next_${setupId}`,
-        },
-        {
-            type: ComponentType.Button,
-            style: ButtonStyle.Secondary,
-            label: 'Back',
-            custom_id: `setup_back_${setupId}`,
-        },
-        {
-            type: ComponentType.Button,
-            style: ButtonStyle.Danger,
-            label: 'Cancel',
-            custom_id: `setup_cancel_${setupId}`,
-        },
-    ] as any;
-
-    if (isEditing) {
-        actionRowComponents.splice(2, 0, {
-            type: ComponentType.Button,
-            style: ButtonStyle.Secondary,
-            label: 'Dump JSON',
-            custom_id: `list_dump_${setupId}`,
-        });
-    }
-
-    components.push({
-        type: ComponentType.ActionRow,
-        components: actionRowComponents,
-    });
-
-    return {components};
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    ...(rewardsCount >= 25 ? [] : [
+                        {
+                            type: ComponentType.ActionRow,
+                            components: [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Success,
+                                    label: 'Add Reward Role',
+                                    custom_id: `setup_add_reward_${setupId}`
+                                },
+                            ],
+                        },
+                    ]) as APIComponentInContainer[],
+                    ...(state.rewards.length > 0 ? state.rewards.map((role, index) => {
+                        return {
+                            type: ComponentType.Section,
+                            components: [
+                                {
+                                    type: ComponentType.TextDisplay,
+                                    content: `${index + 1}. <@&${role.role_id}>${role.min_votes > 0 ? ` (min. ${role.min_votes} votes)` : ''}${role.duration_min > 0 ? ` (${msToReadable(role.duration_min * 60 * 1000)})` : ''}`,
+                                },
+                            ],
+                            accessory: {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Danger,
+                                label: 'Remove',
+                                custom_id: `setup_remove_reward_${setupId}_${index}`,
+                            },
+                        }
+                    }) : []) as APIComponentInContainer[],
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: `-# ${rewardsCount}/25 configure reward roles`
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    ...(isEditing ? [
+                        {
+                            type: ComponentType.ActionRow,
+                            components: [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Secondary,
+                                    label: 'Dump Settings',
+                                    custom_id: `list_dump_${setupId}`,
+                                }
+                            ],
+                        },
+                    ] : []) as APIComponentInContainer[],
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Primary,
+                                label: 'Next',
+                                custom_id: `setup_next_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Back',
+                                custom_id: `setup_back_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Danger,
+                                label: 'Cancel',
+                                custom_id: `setup_cancel_${setupId}`,
+                            },
+                        ],
+                    },
+                ]
+            }
+        ]
+    };
 }
 
 export function buildAddRewardModal(setupId: string): APIModalInteractionResponseCallbackData {
@@ -799,6 +906,34 @@ export function buildCompleteStep(setupId: string, state: TSetupState): RESTPost
     const entityType = state.entity_type || 'bot';
     const showDiscordBotList = entityType === 'bot' || entityType === 'game';
 
+    const lists: APIComponentInMessageActionRow[] = [];
+    if (entityType === 'bot' || entityType === 'server' || entityType === 'game') {
+        lists.push({
+            type: ComponentType.Button,
+            style: ButtonStyle.Primary,
+            label: 'Top.gg',
+            emoji: {name: '🔗'},
+            custom_id: `setup_platform_topgg_${setupId}`,
+        });
+    }
+    if (entityType === 'bot' || entityType === 'server') {
+        lists.push({
+            type: ComponentType.Button,
+            style: ButtonStyle.Primary,
+            label: 'DiscordBotList.com',
+            emoji: {name: '🔗'},
+            custom_id: `setup_platform_discordbotlist_${setupId}`,
+        });
+
+        lists.push({
+            type: ComponentType.Button,
+            style: ButtonStyle.Primary,
+            label: 'Discords.com',
+            emoji: {name: '🔗'},
+            custom_id: `setup_platform_discordscom_${setupId}`,
+        });
+    }
+
     return {
         components: [
             {
@@ -834,27 +969,7 @@ export function buildCompleteStep(setupId: string, state: TSetupState): RESTPost
             {
                 type: ComponentType.ActionRow,
                 components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'top.gg',
-                        emoji: {name: '🔗'},
-                        custom_id: `setup_platform_topgg_${setupId}`,
-                    },
-                    ...(showDiscordBotList ? [{
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'discordbotlist.com',
-                        emoji: {name: '🔗'},
-                        custom_id: `setup_platform_discordbotlist_${setupId}`,
-                    } as const] : []),
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Primary,
-                        label: 'discords.com',
-                        emoji: {name: '🔗'},
-                        custom_id: `setup_platform_discordscom_${setupId}`,
-                    },
+                    ...lists,
                     {
                         type: ComponentType.Button,
                         style: ButtonStyle.Link,

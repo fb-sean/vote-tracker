@@ -3,6 +3,8 @@ import Logger from "@Utils/Logger";
 import type {ISendExternalWebhookPayload} from "@Types/Workers";
 import Redis from "@API/RedisCache";
 import axios from "axios";
+import {errorComponent} from "@Utils/Components";
+import {blockedHostnames} from "@Utils/Http";
 
 export default class SendExternalWebhookWorker implements TWorker {
     jobName = EWorkerJobs.SendExternalWebhook;
@@ -81,6 +83,21 @@ export default class SendExternalWebhookWorker implements TWorker {
                 return;
             }
 
+            try {
+                const Url = new URL(url);
+
+                if (Url.protocol !== 'https:') {
+                    return Logger.warn(`External webhook ${url} is not using HTTPS, skipping`, 'EXTERNAL_WEBHOOK');
+                }
+
+                const blockedHostname = blockedHostnames.find(hostname => Url.hostname.includes(hostname));
+                if (blockedHostname) {
+                    return Logger.warn(`External webhook ${url} is using a blocked hostname (${blockedHostname}), skipping`, 'EXTERNAL_WEBHOOK');
+                }
+            } catch {
+
+            }
+
             const response = await axios.post('https://http-proxy-worker.discordbots.xyz', {
                 payload: payload,
                 url: url
@@ -107,7 +124,6 @@ export default class SendExternalWebhookWorker implements TWorker {
                 `Failed to send external webhook: ${err.message || err}`,
                 'EXTERNAL_WEBHOOK'
             );
-            console.log(err);
         }
     }
 }

@@ -1,6 +1,12 @@
 import {Context} from "@Utils/Context";
 import {ButtonStyle, ComponentType, MessageFlags, RESTPostAPIChannelMessageJSONBody,} from "discord-api-types/v10";
-import {createEditState, getSetupState, type TSetupState, updateSetupState} from "@Utils/SetupManager";
+import {
+    checkForDuplicateEntityId,
+    createEditState,
+    getSetupState,
+    type TSetupState,
+    updateSetupState
+} from "@Utils/SetupManager";
 import {
     buildChannelAndWebhookStep,
     buildEntityIdStep, buildEntitySelectionStep,
@@ -35,7 +41,9 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
     const step = state.current_step;
 
     if (step === 0) {
-        return ctx.update(buildPayload(buildEntitySelectionStep(setupId)));
+        const hasServerEntity = await checkForDuplicateEntityId(ctx.interaction.guild_id!);
+
+        return ctx.update(buildPayload(buildEntitySelectionStep(setupId, hasServerEntity)));
     }
 
     if (step === 1) {
@@ -65,7 +73,7 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
             {
                 type: ComponentType.Button,
                 style: ButtonStyle.Secondary,
-                label: 'Dump JSON',
+                label: 'Dump Settings',
                 custom_id: `list_dump_${setupId}`,
             },
             {
@@ -250,7 +258,7 @@ export async function handleListDelete(ctx: Context, setupId: string) {
             },
             {
                 type: ComponentType.TextDisplay,
-                content: '> 💡 Consider using "Dump JSON" to backup your configuration before deleting.',
+                content: '> 💡 Consider using "Dump Settings" to backup your configuration before deleting.',
             },
             {
                 type: ComponentType.Separator,
@@ -268,7 +276,7 @@ export async function handleListDelete(ctx: Context, setupId: string) {
                     {
                         type: ComponentType.Button,
                         style: ButtonStyle.Secondary,
-                        label: 'Dump JSON',
+                        label: 'Dump Settings',
                         custom_id: `list_dump_${setupId}`,
                     },
                     {
