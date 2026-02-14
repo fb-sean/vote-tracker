@@ -146,7 +146,7 @@ export function buildUnsetupConnectionsStep(setupId: string, connections: TopggC
 
                                         switch (connection.project_type) {
                                             case 'bot':
-                                                label = connection['bot_username'] ? ('Bot: ' + connection['bot_username']) : `Bot ID: ${connection.project_platform_id}`;
+                                                label = (connection.project_name || connection['bot_username']) ? ('Bot: ' + (connection.project_name || connection['bot_username'])) : `Bot ID: ${connection.project_platform_id}`;
                                                 description = 'Click to set up this bot';
 
                                                 break;
@@ -156,7 +156,7 @@ export function buildUnsetupConnectionsStep(setupId: string, connections: TopggC
 
                                                 break;
                                             case 'game':
-                                                label = 'Game ID: ' + connection.project_platform_id;
+                                                label = connection.project_name ? ('Game: ' + connection.project_name) : ('Game ID: ' + connection.project_platform_id);
                                                 description = 'Click to set up this game';
 
                                                 break;

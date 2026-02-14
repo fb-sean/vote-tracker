@@ -17,6 +17,12 @@ const TopggConnectionSchema = new Schema(
         project_platform_id: {
             type: String,
         },
+        project_name: {
+            type: String,
+        },
+        project_avatar_url: {
+            type: String,
+        },
         project_type: {
             type: String,
         },

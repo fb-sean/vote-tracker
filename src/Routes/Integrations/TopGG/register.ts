@@ -61,6 +61,8 @@ export default class RegisterRoute implements TRoute {
                 project_id: data.project.id,
                 project_platform: data.project.platform,
                 project_platform_id: data.project.platform_id,
+                project_name: data.project.name,
+                project_avatar_url: data.project.avatar_url,
                 project_type: data.project.type,
                 user_id: data.user.platform_id,
                 internal_webhook_token: internalWebhookToken
