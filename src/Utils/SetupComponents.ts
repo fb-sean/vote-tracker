@@ -3,12 +3,13 @@ import {
     APIComponentInMessageActionRow,
     APIModalInteractionResponseCallbackData,
     ButtonStyle,
-    ComponentType,
+    ComponentType, MessageFlags,
     RESTPostAPIChannelMessageJSONBody
 } from "discord-api-types/v10";
 import {TSetupState} from "@Utils/SetupManager";
 import {TopggConnection} from "@Schemas/Integrations/Topgg";
 import {BrightImages} from "@Utils/BrightImages";
+import {successComponent} from "@Utils/Components";
 
 function msToReadable(ms) {
     const weeks = Math.floor(ms / (7 * 24 * 60 * 60 * 1000));
@@ -1066,146 +1067,230 @@ export function buildPlatformTopGGGuide(setupId: string, state: TSetupState, web
     const entityId = state.entity_id || '';
     const isGame = state.entity_type === 'game';
 
-    const components: any[] = [
-        {
-            type: ComponentType.TextDisplay,
-            content: '# Connect to top.gg',
-        },
-        {
-            type: ComponentType.Container,
-            accent_color: 5763719,
-            components: [
-                {
-                    type: ComponentType.TextDisplay,
-                    content: '## Step-by-Step Guide',
-                },
-            ],
-        },
-    ];
-
     if (hasExistingConnection) {
-        components.push({
-            type: ComponentType.Container,
-            accent_color: 5763719,
+        return {
             components: [
                 {
-                    type: ComponentType.TextDisplay,
-                    content: '## ✅ Already Connected!\nA top.gg connection for this entity already exists. Everything is set up and you\'re ready to go - no further action needed!',
-                },
+                    type: ComponentType.Container,
+                    accent_color: 5763719,
+                    components: [
+                        {
+                            type: ComponentType.Section,
+                            accessory: {
+                                type: ComponentType.Thumbnail,
+                                media: {
+                                    url: BrightImages.ThumbsUp
+                                }
+                            },
+                            components: [
+                                {
+                                    type: ComponentType.TextDisplay,
+                                    content: '### Votes - Setup Wizard\n-# Platform Integration'
+                                },
+                                {
+                                    type: ComponentType.TextDisplay,
+                                    content: 'A top.gg connection for this entity already exists. Everything is set up and you\'re ready to go - no further action needed!'
+                                },
+                            ]
+                        },
+                        {
+                            type: ComponentType.Separator,
+                            spacing: 1,
+                        },
+                        {
+                            type: ComponentType.ActionRow,
+                            components: [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Secondary,
+                                    label: 'Back',
+                                    custom_id: `setup_platform_back_${setupId}`,
+                                },
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Success,
+                                    label: 'Finish Setup',
+                                    custom_id: `setup_finish_${setupId}`,
+                                },
+                            ],
+                        }
+                    ]
+                }
             ],
-        });
-    } else {
-        const integrationsUrl = `https://top.gg/${isGame ? 'roblox/games' : 'discord'}/${entityType}/${entityId}/dashboard/integrations`;
-        components.push({
-            type: ComponentType.TextDisplay,
-            content: `### 1. Visit the Integrations Page\nNavigate to:\n<${integrationsUrl}>\n`,
-        });
-        components.push({
-            type: ComponentType.Separator,
-            spacing: 1,
-        });
-        components.push({
-            type: ComponentType.TextDisplay,
-            content: '### 2. Find the "Votes" Bot\nLook for the bot named **"Votes"** in the integrations list.',
-        });
-        components.push({
-            type: ComponentType.Separator,
-            spacing: 1,
-        });
-        components.push({
-            type: ComponentType.TextDisplay,
-            content: '### 3. Click "Install"\nClick the **"Install"** button on the "Votes" bot to connect it.\n\n> 💡 No URL or webhook configuration needed - just install the "Votes" bot!',
-        });
+        };
     }
-
-    components.push({
-        type: ComponentType.Separator,
-        spacing: 1,
-    });
-    components.push({
-        type: ComponentType.ActionRow,
-        components: [
-            {
-                type: ComponentType.Button,
-                style: ButtonStyle.Secondary,
-                label: 'Back',
-                custom_id: `setup_platform_back_${setupId}`,
-            },
-            {
-                type: ComponentType.Button,
-                style: ButtonStyle.Success,
-                label: 'Finish Setup',
-                custom_id: `setup_finish_${setupId}`,
-            },
-        ],
-    });
-
-    return {components};
-}
-
-export function buildPlatformDiscordBotListGuide(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string): RESTPostAPIChannelMessageJSONBody {
-    const entityId = state.entity_id || '';
 
     return {
         components: [
             {
-                type: ComponentType.TextDisplay,
-                content: '# Connect to discordbotlist.com',
-            },
-            {
                 type: ComponentType.Container,
-                accent_color: 5763719,
+                accent_color: 6387427,
                 components: [
+                    {
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Thumbnail,
+                            media: {
+                                url: BrightImages.ThumbsUp
+                            }
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: '### Votes - Setup Wizard\n-# Platform Integration - Top.gg'
+                            }
+                        ]
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
                     {
                         type: ComponentType.TextDisplay,
-                        content: '## Step-by-Step Guide',
+                        content: `**1. Visit the Integrations Page**\nNavigate to:\n<https://top.gg${isGame ? '/roblox/games' : ''}/${entityType}/${entityId}/dashboard/integrations>\n`,
                     },
-                ],
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '**2. Find the "Votes" Bot**\nLook for the bot named **"Votes"** in the integrations list.',
+                    },
+                    {
+                        type: ComponentType.MediaGallery,
+                        items: [
+                            {
+                                media: {
+                                    url: 'https://media.discordapp.net/attachments/843258152802844703/1473030700168122408/image.png'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '**3. Click "Install"**\nClick the **"Install"** button on the "Votes" bot to connect it.\n\n> 💡 No URL or webhook configuration needed - just install the "Votes" bot!',
+                    },
+                    {
+                        type: ComponentType.MediaGallery,
+                        items: [
+                            {
+                                media: {
+                                    url: 'https://media.discordapp.net/attachments/843258152802844703/1473030947535327324/image.png'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Back',
+                                custom_id: `setup_platform_back_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Success,
+                                label: 'Finish Setup',
+                                custom_id: `setup_finish_${setupId}`,
+                            },
+                        ],
+                    }
+                ]
             },
+        ],
+    };
+}
+
+export function buildPlatformDiscordBotListGuide(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string): RESTPostAPIChannelMessageJSONBody {
+    const entityId = state.entity_id || '';
+    const entityType = state.entity_type === 'bot' ? 'bots' : 'servers';
+
+    return {
+        components: [
             {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: `### 1. Visit Your Bot Page\nNavigate to:\n<https://discordbotlist.com/bots/${entityId}/edit>\n`,
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: '### 2. Go to Webhook Settings\nLook for "Upvote Webhook" in your bot dashboard.',
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: `### 3. Add Your Webhook URL\nEnter the following URL:\n\`\`\`\n${webhookUrl}\n\`\`\`\n\nThe auth token is included in the URL automatically.`,
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.ActionRow,
+                type: ComponentType.Container,
+                accent_color: 6387427,
                 components: [
                     {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Secondary,
-                        label: 'Back',
-                        custom_id: `setup_platform_back_${setupId}`,
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Thumbnail,
+                            media: {
+                                url: BrightImages.ThumbsUp
+                            }
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: '### Votes - Setup Wizard\n-# Platform Integration - DiscordBotList.com'
+                            }
+                        ]
                     },
                     {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Success,
-                        label: 'Finish Setup',
-                        custom_id: `setup_finish_${setupId}`,
+                        type: ComponentType.Separator,
+                        spacing: 1,
                     },
-                ],
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: `**1. Visit the Edit Page**\nNavigate to:\n<https://discordbotlist.com/${entityType}/${entityId}/edit>\n`,
+                    },
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '**2. Scroll down to "Upvote Webhook"**',
+                    },
+                    {
+                        type: ComponentType.MediaGallery,
+                        items: [
+                            {
+                                media: {
+                                    url: 'https://media.discordapp.net/attachments/843258152802844703/1473034738049487075/image.png'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '**3. Paste the following into the text fields**\nIn the "Upvote Webhook" section, paste the following URL:\n\`\`\`\n' + webhookUrl + '\n\`\`\`\n-# (If you are a mobile user, just touch the url!)\nAnd paste the following token:\n\`\`\`\n' + maskedToken + '\n\`\`\`\n-# (If you are a mobile user, just touch the token!)\ninto the "Webhook Secret" field. Check the image below.',
+                    },
+                    {
+                        type: ComponentType.MediaGallery,
+                        items: [
+                            {
+                                media: {
+                                    url: 'https://media.discordapp.net/attachments/843258152802844703/1473035870297653358/image.png'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '**4. Solve the captcha and press "Edit"**\nDone!',
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Back',
+                                custom_id: `setup_platform_back_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Success,
+                                label: 'Finish Setup',
+                                custom_id: `setup_finish_${setupId}`,
+                            },
+                        ],
+                    }
+                ]
             },
         ],
     };

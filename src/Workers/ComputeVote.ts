@@ -19,7 +19,11 @@ export default class ComputeVoteWorker implements TWorker {
         const startTime = Date.now();
 
         try {
-            const settings = await SettingsModel.find({entity_id: data.entity_id, entity_type: data.entity_type, disabled: false});
+            const settings = await SettingsModel.find({
+                entity_id: data.entity_id,
+                entity_type: data.entity_type,
+                disabled: false
+            });
             for (const setting of settings) {
                 if (setting.disabled) {
                     Logger.info(`Settings not found or disabled for ${setting.server_id}, skipping post-processing`, 'COMPUTE_VOTE');
@@ -276,14 +280,14 @@ export default class ComputeVoteWorker implements TWorker {
     }
 
     private async checkIsFirstVote(payload: IComputeVotePayload): Promise<boolean> {
-        const existingVote = await VoteModel.findOne({
+        const existingVote = await VoteModel.exists({
             user_id: payload.user_id,
             entity_id: payload.entity_id,
             entity_type: payload.entity_type,
             is_test: false,
         });
 
-        return !existingVote;
+        return existingVote ? false : true;
     }
 
     private async getOrFetchUserData(payload: IComputeVotePayload): Promise<IUserData | null> {

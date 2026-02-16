@@ -68,6 +68,11 @@ export async function handleSetupServer(ctx: Context, setupId: string) {
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'This command can only be used in a server.'));
     }
 
+    const existingEntity = await checkForDuplicateEntityId(serverId);
+    if (existingEntity) {
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'An entity with the same ID already exists. Please select a different ID.'));
+    }
+
     const state = await updateSetupState(setupId, {entity_type: 'server', entity_id: serverId, current_step: 2});
     if (!state) {
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Setup session expired. Please start over.'));
@@ -381,6 +386,11 @@ export async function handleSetupEntityIdModal(ctx: Context, setupId: string, en
     const resolved = (ctx.interaction.data as APIModalSubmitInteraction['data']).resolved;
     if (resolved && resolved.users && !resolved.users[entityId].bot) {
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'The selected user is not a bot. Please select a bot instead.'));
+    }
+
+    const existingEntity = await checkForDuplicateEntityId(entityId);
+    if (existingEntity) {
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'An entity with the same ID already exists. Please select a different ID.'));
     }
 
     const state = await updateSetupState(setupId, {entity_id: entityId.trim(), current_step: 2});
