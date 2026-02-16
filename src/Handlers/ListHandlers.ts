@@ -1,8 +1,14 @@
 import {Context} from "@Utils/Context";
-import {ButtonStyle, ComponentType, MessageFlags, RESTPostAPIChannelMessageJSONBody,} from "discord-api-types/v10";
+import {
+    APIComponentInContainer, APIComponentInMessageActionRow,
+    ButtonStyle,
+    ComponentType,
+    MessageFlags,
+    RESTPostAPIChannelMessageJSONBody,
+} from "discord-api-types/v10";
 import {
     checkForDuplicateEntityId,
-    createEditState,
+    createEditState, deleteSetupState,
     getSetupState,
     type TSetupState,
     updateSetupState
@@ -13,6 +19,9 @@ import {
     buildMessagesStep,
     buildRewardsStep,
 } from "@Utils/SetupComponents";
+import {errorComponent, successComponent} from "@Utils/Components";
+import SettingsModel from "@Schemas/Settings";
+import {BrightImages} from "@Utils/BrightImages";
 
 function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: number) {
     return {
@@ -24,12 +33,12 @@ function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: num
 export async function handleListEdit(ctx: Context, setupId: string) {
     const editSessionId = await createEditState(setupId, ctx.user.id);
     if (!editSessionId) {
-        return ctx.reply({content: 'Failed to load setup. It may have been deleted.'});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Failed to load setup. It may have been deleted.'));
     }
 
     const state = await getSetupState(editSessionId);
     if (!state) {
-        return ctx.reply({content: 'Failed to initialize edit session.'});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Failed to initialize edit session.'));
     }
 
     await updateSetupState(editSessionId, {current_step: 2});
@@ -66,13 +75,13 @@ export async function refreshCurrentStep(ctx: Context, setupId: string, state: T
         return ctx.update(buildPayload(buildCompleteStep(setupId, state)));
     }
 
-    return ctx.reply({content: 'Invalid step.'});
+    return ctx.reply(errorComponent('Votes - Setup Wizard', 'Invalid step.'));
 }
 
 export async function handleListDump(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.'});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Edit session expired. Please start over.'));
     }
 
     const jsonData = {
@@ -98,63 +107,78 @@ export async function handleListDump(ctx: Context, setupId: string) {
 export async function handleListDelete(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.'});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Edit session expired. Please start over.'));
     }
 
     if (!state.editing_id) {
-        return ctx.reply({content: 'Cannot delete: this is a new setup, not an existing one.'});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Cannot delete: This is a new setup, not an existing one.'));
     }
+
+    const configSummary = [
+        `**Configuration for:** ${state.entity_type === 'bot' ? `<@${state.entity_id}>` : (state.entity_type === 'server' ? `this server` : `Roblox Game ${state.entity_id}`)}`,
+        state.channel_id ? `**Logging Channel:** <#${state.channel_id}>` : '**Logging Channel:** Not set',
+        state.external_webhook_url ? `**External Webhook:** Set` : '**External Webhook:** Not set',
+        state.rewards.length > 0 ? `**Reward Roles:** ${state.rewards.length}` : '**Reward Roles:** None',
+        state.messages.length > 0 ? `**Messages:** ${state.messages.length} configured` : '**Messages:** Defaults',
+    ].join('\n');
 
     return ctx.update(buildPayload({
         components: [
             {
-                type: ComponentType.TextDisplay,
-                content: '# ⚠️ Delete Setup',
-            },
-            {
                 type: ComponentType.Container,
-                accent_color: 15548997,
+                accent_color: 6387427,
                 components: [
+                    {
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Thumbnail,
+                            media: {
+                                url: BrightImages.ThumbsUp
+                            }
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: '### Votes - Setup Wizard\n-# Delete Setup ⚠️'
+                            },
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: `**Are you sure?**\n\nYou are about to delete the vote tracking setup for:\n${configSummary}\n\nThis action **cannot be undone**. All configuration including rewards, messages, and webhook settings will be permanently lost.`
+                            }
+                        ]
+                    },
                     {
                         type: ComponentType.TextDisplay,
-                        content: `## Are you sure?\n\nYou are about to delete the vote tracking setup for:\n**Type:** ${state.entity_type === 'bot' ? 'Bot' : 'Server'}\n**Entity ID:** ${state.entity_id}\n\nThis action **cannot be undone**. All configuration including rewards, messages, and webhook settings will be permanently lost.`,
-                    },
-                ],
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: '> 💡 Consider using "Dump Settings" to backup your configuration before deleting.',
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Danger,
-                        label: 'Yes, Delete It',
-                        custom_id: `list_delete_confirm_${setupId}`,
+                        content: '> 💡 Consider using "Dump Settings" to backup your configuration before deleting.',
                     },
                     {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Secondary,
-                        label: 'Dump Settings',
-                        custom_id: `list_dump_${setupId}`,
+                        type: ComponentType.Separator,
+                        spacing: 1,
                     },
                     {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Secondary,
-                        label: 'Cancel',
-                        custom_id: `list_delete_cancel_${setupId}`,
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Danger,
+                                label: 'Yes, Delete It',
+                                custom_id: `list_delete_confirm_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Dump Settings',
+                                custom_id: `list_dump_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Cancel',
+                                custom_id: `list_delete_cancel_${setupId}`,
+                            },
+                        ],
                     },
-                ],
+                ]
             },
         ],
     }));
@@ -163,52 +187,24 @@ export async function handleListDelete(ctx: Context, setupId: string) {
 export async function handleListDeleteConfirm(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.'});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Edit session expired. Please start over.'));
     }
 
     if (!state.editing_id) {
-        return ctx.reply({content: 'Cannot delete: this is a new setup, not an existing one.'});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Cannot delete: This is a new setup, not an existing one.'));
     }
-
-    const SettingsModel = (await import('@Schemas/Settings')).default;
 
     await SettingsModel.deleteOne({_id: state.editing_id});
 
-    const {deleteSetupState} = await import('@Utils/SetupManager');
     await deleteSetupState(setupId);
 
-    return ctx.update(buildPayload({
-        components: [
-            {
-                type: ComponentType.TextDisplay,
-                content: '# ✅ Setup Deleted',
-            },
-            {
-                type: ComponentType.Container,
-                accent_color: 5763719,
-                components: [
-                    {
-                        type: ComponentType.TextDisplay,
-                        content: 'The vote tracking setup has been permanently deleted.',
-                    },
-                ],
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: 'Use `/list` to view your remaining setups or `/setup` to create a new one.',
-            },
-        ],
-    }));
+    return ctx.update(successComponent('Votes - Setup Wizard', 'The vote tracking setup has been permanently deleted.\n-# Use `/list` to view your remaining setups or `/setup` to create a new one.'));
 }
 
 export async function handleListDeleteCancel(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.'});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Edit session expired. Please start over.'));
     }
 
     return refreshCurrentStep(ctx, setupId, state);
@@ -217,12 +213,12 @@ export async function handleListDeleteCancel(ctx: Context, setupId: string) {
 export async function handleListToggleEnable(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.'});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Edit session expired. Please start over.'));
     }
 
     const updated = await updateSetupState(setupId, {disable: false});
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Edit session expired. Please start over.'));
     }
 
     return refreshCurrentStep(ctx, setupId, updated);
@@ -231,12 +227,12 @@ export async function handleListToggleEnable(ctx: Context, setupId: string) {
 export async function handleListToggleDisable(ctx: Context, setupId: string) {
     const state = await getSetupState(setupId);
     if (!state) {
-        return ctx.reply({content: 'Edit session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Edit session expired. Please start over.'));
     }
 
     const updated = await updateSetupState(setupId, {disable: true});
     if (!updated) {
-        return ctx.reply({content: 'Setup session expired. Please start over.', flags: MessageFlags.Ephemeral});
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Edit session expired. Please start over.'));
     }
 
     return refreshCurrentStep(ctx, setupId, updated);
