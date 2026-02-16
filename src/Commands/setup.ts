@@ -6,19 +6,17 @@ import {buildEntitySelectionStep, buildUnsetupConnectionsStep} from "@Utils/Setu
 import {errorComponent, loadingComponent} from "@Utils/Components";
 
 export default class SetupCommand implements Command {
+    // @ts-ignore
     data = {
         name: 'setup',
         description: 'Setup vote tracking for your server or bot',
         integration_types: [ApplicationIntegrationType.GuildInstall],
         contexts: [InteractionContextType.Guild],
+        default_member_permissions: 1 << 5,
     };
 
-    async execute(ctx: Context, additional) {
-        if (additional && additional.directUpdate) {
-            await ctx.update(loadingComponent('Votes - Setup Wizard', 'Baking some data together, give me a second!'));
-        } else {
-            await ctx.reply(loadingComponent('Votes - Setup Wizard', 'Baking some data together, give me a second!'));
-        }
+    async execute(ctx: Context) {
+        await ctx.reply(loadingComponent('Votes - Setup Wizard', 'Baking some data together, give me a second!'));
 
         if (!ctx.isInGuild) {
             return ctx.editReply(errorComponent('Votes - Setup Wizard', 'This command can only be used in a server.'));

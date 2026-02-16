@@ -7,11 +7,13 @@ import {
 import {BrightImages} from "@Utils/BrightImages";
 
 export default class HelpCommand implements Command {
+    // @ts-ignore
     data = {
         name: 'help',
         description: 'Understand how to use Votes',
         integration_types: [ApplicationIntegrationType.GuildInstall, ApplicationIntegrationType.UserInstall],
         contexts: [InteractionContextType.Guild, InteractionContextType.BotDM, InteractionContextType.PrivateChannel],
+        default_member_permissions: 1 << 5,
     };
 
     async execute(ctx: Context) {

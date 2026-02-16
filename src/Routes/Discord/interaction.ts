@@ -402,7 +402,7 @@ export default class InteractionRoute implements TRoute {
                         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Something went wrong.'));
                     }
 
-                    return await command.execute(ctx, {directUpdate: true});
+                    return await command.execute(ctx);
                 case 'list':
                     if (!ctx.isInGuild) {
                         return ctx.reply({content: 'List can only be used in a server.'});
@@ -411,7 +411,7 @@ export default class InteractionRoute implements TRoute {
                     const setups = await getAllSetupsForServer(ctx.interaction.guild_id!);
                     const listPayload = buildSetupList(setups, ctx.interaction.guild_id!);
 
-                    return ctx.update({
+                    return ctx.reply({
                         ...listPayload,
                         flags: MessageFlags.IsComponentsV2 | MessageFlags.SuppressNotifications | MessageFlags.Ephemeral,
                     });

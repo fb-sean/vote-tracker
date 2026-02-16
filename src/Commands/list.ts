@@ -4,11 +4,13 @@ import {ApplicationIntegrationType, InteractionContextType, MessageFlags,} from 
 import {buildSetupList, getAllSetupsForServer} from "@Utils/SetupManager";
 
 export default class ListCommand implements Command {
+    // @ts-ignore
     data = {
         name: 'list',
         description: 'List all vote tracking setups for this server',
         integration_types: [ApplicationIntegrationType.GuildInstall],
         contexts: [InteractionContextType.Guild],
+        default_member_permissions: 1 << 5,
     };
 
     async execute(ctx: Context) {
