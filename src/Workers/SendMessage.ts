@@ -80,8 +80,8 @@ export default class SendMessageWorker implements TWorker {
                 'server': 'https://discordbotlist.com/servers/' + platform.entity_id + '/upvote',
             },
             'discords': {
-                'bot': 'https://discordbotlist.com/bots/' + platform.entity_id + '/upvote',
-                'server': 'https://discordbotlist.com/servers/' + platform.entity_id + '/upvote',
+                'bot': 'https://discords.com/bots/bot/' + platform.entity_id + '/vote',
+                'server': 'https://discords.com/servers/' + platform.entity_id + '/upvote',
             }
         };
 

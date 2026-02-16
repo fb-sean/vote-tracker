@@ -1297,77 +1297,92 @@ export function buildPlatformDiscordBotListGuide(setupId: string, state: TSetupS
 }
 
 export function buildPlatformDiscordsComGuide(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string): RESTPostAPIChannelMessageJSONBody {
-    const entityType = state.entity_type === 'bot' ? 'bot' : 'servers'; // Note: discords.com uses "servers" not "server"
     const entityId = state.entity_id || '';
+    const entityType = state.entity_type;
 
     return {
         components: [
             {
-                type: ComponentType.TextDisplay,
-                content: '# Connect to discords.com',
-            },
-            {
                 type: ComponentType.Container,
-                accent_color: 5763719,
+                accent_color: 6387427,
                 components: [
+                    {
+                        type: ComponentType.Section,
+                        accessory: {
+                            type: ComponentType.Thumbnail,
+                            media: {
+                                url: BrightImages.ThumbsUp
+                            }
+                        },
+                        components: [
+                            {
+                                type: ComponentType.TextDisplay,
+                                content: '### Votes - Setup Wizard\n-# Platform Integration - Discords.com'
+                            }
+                        ]
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
                     {
                         type: ComponentType.TextDisplay,
-                        content: '## Step-by-Step Guide',
-                    },
-                ],
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: `### 1. Visit the Integrations Page\nNavigate to:\n<https://discords.com/${entityType}/${entityId}/dashboard/integrations>`,
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: '### 2. Find Vote Webhooks\nLook for "Vote Webhooks" or "Webhooks" section in the integrations.',
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: `### 3. Add Your Webhook URL\nEnter the following URL:\n\`\`\`\n${webhookUrl}\n\`\`\`\n\nThe auth token is included in the URL automatically.`,
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.TextDisplay,
-                content: '> 💡 discords.com supports both bots and servers. Make sure you select the correct entity type!',
-            },
-            {
-                type: ComponentType.Separator,
-                spacing: 1,
-            },
-            {
-                type: ComponentType.ActionRow,
-                components: [
-                    {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Secondary,
-                        label: 'Back',
-                        custom_id: `setup_platform_back_${setupId}`,
+                        content: `**1. Visit the Edit Page**\nNavigate to:\n<https://discords.com/bots/${entityType}/${entityId}/edit>\n`,
                     },
                     {
-                        type: ComponentType.Button,
-                        style: ButtonStyle.Success,
-                        label: 'Finish Setup',
-                        custom_id: `setup_finish_${setupId}`,
+                        type: ComponentType.TextDisplay,
+                        content: '**2. Scroll down to "Webhook URL"**',
                     },
-                ],
+                    {
+                        type: ComponentType.MediaGallery,
+                        items: [
+                            {
+                                media: {
+                                    url: 'https://media.discordapp.net/attachments/843258152802844703/1473043975907577909/image.png'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '**3. Paste the following into the text fields**\nIn the "Webhook URL" section, paste the following URL:\n\`\`\`\n' + webhookUrl + '\n\`\`\`\n-# (If you are a mobile user, just touch the url!)\nAnd paste the following token:\n\`\`\`\n' + maskedToken + '\n\`\`\`\n-# (If you are a mobile user, just touch the token!)\ninto the "Webhook Secret" field. Check the image below.',
+                    },
+                    {
+                        type: ComponentType.MediaGallery,
+                        items: [
+                            {
+                                media: {
+                                    url: 'https://media.discordapp.net/attachments/843258152802844703/1473044499839320280/image.png'
+                                }
+                            }
+                        ]
+                    },
+                    {
+                        type: ComponentType.TextDisplay,
+                        content: '**4. Scroll down and press "Apply changes"**\nDone!',
+                    },
+                    {
+                        type: ComponentType.Separator,
+                        spacing: 1,
+                    },
+                    {
+                        type: ComponentType.ActionRow,
+                        components: [
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Secondary,
+                                label: 'Back',
+                                custom_id: `setup_platform_back_${setupId}`,
+                            },
+                            {
+                                type: ComponentType.Button,
+                                style: ButtonStyle.Success,
+                                label: 'Finish Setup',
+                                custom_id: `setup_finish_${setupId}`,
+                            },
+                        ],
+                    }
+                ]
             },
         ],
     };
