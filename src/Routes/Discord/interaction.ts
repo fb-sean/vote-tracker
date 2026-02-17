@@ -402,7 +402,7 @@ export default class InteractionRoute implements TRoute {
                         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Something went wrong.'));
                     }
 
-                    return await command.execute(ctx);
+                    return await command.execute(ctx, {directUpdate: true});
                 case 'list':
                     if (!ctx.isInGuild) {
                         return ctx.reply({content: 'List can only be used in a server.'});

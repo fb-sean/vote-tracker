@@ -15,8 +15,12 @@ export default class SetupCommand implements Command {
         default_member_permissions: 1 << 5,
     };
 
-    async execute(ctx: Context) {
-        await ctx.reply(loadingComponent('Votes - Setup Wizard', 'Baking some data together, give me a second!'));
+    async execute(ctx: Context, additional) {
+        if (additional && additional.directUpdate) {
+            await ctx.update(loadingComponent('Votes - Setup Wizard', 'Baking some data together, give me a second!'));
+        } else {
+            await ctx.reply(loadingComponent('Votes - Setup Wizard', 'Baking some data together, give me a second!'));
+        }
 
         if (!ctx.isInGuild) {
             return ctx.editReply(errorComponent('Votes - Setup Wizard', 'This command can only be used in a server.'));
