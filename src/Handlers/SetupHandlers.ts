@@ -41,6 +41,7 @@ import {refreshCurrentStep as listRefreshCurrentStep} from "@Handlers/ListHandle
 import {errorComponent, infoComponent, successComponent} from "@Utils/Components";
 import {delay} from "bullmq";
 import {blockedHostnames} from "@Utils/Http";
+import Logger from "@Utils/Logger";
 
 function buildPayload(components: RESTPostAPIChannelMessageJSONBody, flags?: number) {
     return {
@@ -133,7 +134,7 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
     if (state.current_step === 2 && state.channel_id) {
         const cooldown = await Redis.getInstance().get('discord:vt:test:cooldown:' + state.channel_id);
         if (!cooldown) {
-            await Redis.getInstance().set('discord:vt:test:cooldown:' + state.channel_id, true, 2 * 60)
+            await Redis.getInstance().set('discord:vt:test:cooldown:' + state.channel_id, true, 30)
 
             try {
                 const message = await DiscordClient.getInstance().rest.post(Routes.channelMessages(state.channel_id), {
@@ -150,6 +151,8 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
                     }
                 }
             } catch (error) {
+                Logger.error('Failed to send test message in channel ' + state.channel_id + '.');
+
                 return ctx.reply(errorComponent('Votes - Setup Wizard', 'Failed to send test message. Please check bot permissions before you continue.'));
             }
         }
@@ -237,10 +240,10 @@ export async function handleSetupTestChannel(ctx: Context, setupId: string) {
 
     const cooldown = await Redis.getInstance().get('discord:vt:test:cooldown:' + state.channel_id);
     if (cooldown) {
-        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Test message already sent in the last 2 minutes. Please wait for 2 minutes before sending another test message.'));
+        return ctx.reply(errorComponent('Votes - Setup Wizard', 'Test message already sent in the last 30 seconds. Please wait for 30 seconds before sending another test message.'));
     }
 
-    await Redis.getInstance().set('discord:vt:test:cooldown:' + state.channel_id, true, 2 * 60)
+    await Redis.getInstance().set('discord:vt:test:cooldown:' + state.channel_id, true, 30)
 
     try {
         await DiscordClient.getInstance().rest.post(Routes.channelMessages(state.channel_id), {
@@ -249,6 +252,8 @@ export async function handleSetupTestChannel(ctx: Context, setupId: string) {
 
         return ctx.reply(successComponent('Votes - Setup Wizard', 'Sent the test message successfully.'));
     } catch (error) {
+        Logger.error('Failed to send test message in channel ' + state.channel_id + '.');
+
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Failed to send test message. Please check bot permissions.'));
     }
 }
