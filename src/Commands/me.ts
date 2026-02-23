@@ -4,20 +4,13 @@ import {
     ApplicationIntegrationType,
     InteractionContextType,
     MessageFlags,
-    ComponentType,
-    APITextDisplayComponent,
-    APIContainerComponent,
-    APISeparatorComponent,
+    ComponentType, ButtonStyle,
 } from "discord-api-types/v10";
 import VoteModel from "@Schemas/Vote";
 import SettingsModel from "@Schemas/Settings";
 import Logger from "@Utils/Logger";
 
-type MessageComponent = APITextDisplayComponent | APIContainerComponent | APISeparatorComponent;
-
-interface MeResponse {
-    components: MessageComponent[];
-}
+type MessageComponent = any;
 
 function formatTimeBetweenVotes(avgHours: number): string {
     if (avgHours < 1) {
@@ -82,27 +75,6 @@ function calculateStreaks(votes: Date[]): { currentStreak: number; bestStreak: n
     return {currentStreak, bestStreak};
 }
 
-function buildNoVotesComponents(): MeResponse {
-    return {
-        components: [
-            {
-                type: ComponentType.TextDisplay,
-                content: '# 📊 Your Vote Statistics',
-            },
-            {
-                type: ComponentType.Container,
-                accent_color: 15548997,
-                components: [
-                    {
-                        type: ComponentType.TextDisplay,
-                        content: `## No Votes Yet\n\nYou haven't voted for any entity in this server in the last 3 months!\n\n> 💡 Use \`/setup\` to configure vote tracking and start earning rewards!`,
-                    },
-                ],
-            },
-        ],
-    };
-}
-
 export default class MeCommand implements Command {
     data = {
         name: 'me',
@@ -139,7 +111,22 @@ export default class MeCommand implements Command {
 
             if (recentVotes.length === 0) {
                 return ctx.editReply({
-                    ...buildNoVotesComponents(),
+                    components: [
+                        {
+                            type: ComponentType.TextDisplay,
+                            content: '# 📊 Your Vote Statistics',
+                        },
+                        {
+                            type: ComponentType.Container,
+                            accent_color: 15548997,
+                            components: [
+                                {
+                                    type: ComponentType.TextDisplay,
+                                    content: `## No Votes Yet\n\nYou haven't voted for any entity in this server in the last 3 months!\n\n> 💡 Use \`/setup\` to configure vote tracking and start earning rewards!`,
+                                },
+                            ],
+                        },
+                    ],
                     flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
                 });
             }
@@ -257,15 +244,51 @@ export default class MeCommand implements Command {
 
             components.push({
                 type: ComponentType.Container,
-                accent_color: 5793266,
+                accent_color: 6387427,
                 components: [
                     {
                         type: ComponentType.TextDisplay,
                         content: `## 📂 Detailed Statistics\n\n` +
-                            `Use the /top command for detailed breakdowns:\n` +
-                            `• </top activity:1470895633929080986> - View voting patterns and streaks\n` +
-                            `• </top platform:1470895633929080986> - Platform statistics\n` +
-                            `• </top entities:1470895633929080986> - Entity breakdown`,
+                            `Use the buttons below to view detailed breakdowns:\n` +
+                            `• **Activity** - View voting patterns and streaks\n` +
+                            `• **Platform** - Platform statistics\n` +
+                            `• **Entities** - Entity breakdown`,
+                    },
+                ],
+            });
+
+            components.push({
+                type: ComponentType.Separator,
+                spacing: 1,
+            });
+
+            components.push({
+                type: ComponentType.ActionRow,
+                components: [
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Primary,
+                        disabled: true,
+                        label: '📊 Overview',
+                        custom_id: 'me_view_overview',
+                    },
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Secondary,
+                        label: '⏰ Activity',
+                        custom_id: 'me_view_activity',
+                    },
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Secondary,
+                        label: '🌐 Platform',
+                        custom_id: 'me_view_platform',
+                    },
+                    {
+                        type: ComponentType.Button,
+                        style: ButtonStyle.Secondary,
+                        label: '🎯 Entities',
+                        custom_id: 'me_view_entities',
                     },
                 ],
             });

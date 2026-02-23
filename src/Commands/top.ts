@@ -5,17 +5,13 @@ import {
     InteractionContextType,
     MessageFlags,
     ComponentType,
-    APITextDisplayComponent,
-    APIContainerComponent,
-    APISeparatorComponent,
     APIApplicationCommandIntegerOption,
-    APIApplicationCommandStringOption,
 } from "discord-api-types/v10";
 import VoteModel from "@Schemas/Vote";
 import SettingsModel from "@Schemas/Settings";
 import Logger from "@Utils/Logger";
 
-type MessageComponent = APITextDisplayComponent | APIContainerComponent | APISeparatorComponent;
+type MessageComponent = any;
 
 interface TopResponse {
     components: MessageComponent[];
@@ -29,46 +25,41 @@ function buildWeekdayBar(distribution: number[], maxCount: number): string {
 
     return distribution.map((count, i) => {
         const percentage = maxCount > 0 ? count / maxCount : 0;
-        const barLength = Math.round(percentage * maxBarLength);
+        const barLength = Math.min(Math.round(percentage * maxBarLength), maxBarLength);
         const bar = '█'.repeat(barLength) + '░'.repeat(maxBarLength - barLength);
 
         return `${WEEKDAY_EMOJIS[i]} **${WEEKDAY_NAMES[i].slice(0, 3)}** \`${count}\`\n${bar}`;
     }).join('\n');
 }
 
-function buildHourlyHeatmap(distribution: number[], maxCount: number): string {
+function buildHourlyHeatmap(distribution: number[]): string {
+    const maxBarLength = 15;
     const blocks: string[] = [];
+
+    const blockCounts: number[] = [];
     for (let i = 0; i < 4; i++) {
         const startHour = i * 6;
         const blockVotes = distribution.slice(startHour, startHour + 6).reduce((a, b) => a + b, 0);
-        const blockMax = Math.max(...distribution.slice(startHour, startHour + 6));
-        const intensity = maxCount > 0 ? Math.round((blockMax / maxCount) * 3) : 0;
-        const intensityChars = ['░', '▒', '▓', '█'];
+        blockCounts.push(blockVotes);
+    }
+
+    const maxBlockCount = Math.max(...blockCounts);
+
+    for (let i = 0; i < 4; i++) {
+        const startHour = i * 6;
+        const blockVotes = blockCounts[i];
+        const percentage = maxBlockCount > 0 ? blockVotes / maxBlockCount : 0;
+        const barLength = Math.min(Math.round(percentage * maxBarLength), maxBarLength);
+        const bar = '█'.repeat(barLength) + '░'.repeat(maxBarLength - barLength);
         const timeLabel = startHour === 0 ? '🌙 12AM-6AM' :
             startHour === 6 ? '🌅 6AM-12PM' :
                 startHour === 12 ? '☀️ 12PM-6PM' :
                     '🌆 6PM-12AM';
 
-        blocks.push(`${timeLabel} \`${blockVotes}\` ${intensityChars[intensity]}`);
+        blocks.push(`${timeLabel} \`${blockVotes}\`\n${bar}`);
     }
 
     return blocks.join('\n');
-}
-
-function formatTimeBetweenVotes(avgHours: number): string {
-    if (avgHours < 1) {
-        const minutes = Math.round(avgHours * 60);
-
-        return `${minutes} minute${minutes !== 1 ? 's' : ''}`;
-    } else if (avgHours < 24) {
-        const hours = Math.round(avgHours * 10) / 10;
-
-        return `${hours} hour${hours !== 1 ? 's' : ''}`;
-    } else {
-        const days = Math.round((avgHours / 24) * 10) / 10;
-
-        return `${days} day${days !== 1 ? 's' : ''}`;
-    }
 }
 
 function formatHour(hour: number): string {
@@ -78,63 +69,14 @@ function formatHour(hour: number): string {
     return hour < 12 ? `${hour} AM` : `${hour - 12} PM`;
 }
 
-function calculateStreaks(votes: Date[]): { currentStreak: number; bestStreak: number } {
-    const streakWindow = 48 * 60 * 60 * 1000;
-    const sortedVotes = votes.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-
-    let currentStreak = 0;
-    let streakCheckTime = Date.now();
-
-    for (let i = sortedVotes.length - 1; i >= 0; i--) {
-        const voteTime = new Date(sortedVotes[i]).getTime();
-
-        if (streakCheckTime - voteTime > streakWindow) {
-            if (i < sortedVotes.length - 1) {
-                const nextVoteTime = new Date(sortedVotes[i + 1]).getTime();
-
-                if (nextVoteTime - voteTime > streakWindow) {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-
-        currentStreak++;
-        streakCheckTime = voteTime;
-    }
-
-    let bestStreak = 1;
-    let currentChain = 1;
-
-    for (let i = 1; i < sortedVotes.length; i++) {
-        const prevVote = new Date(sortedVotes[i - 1]).getTime();
-        const currVote = new Date(sortedVotes[i]).getTime();
-        const timeDiff = currVote - prevVote;
-
-        if (timeDiff <= streakWindow) {
-            currentChain++;
-        } else {
-            bestStreak = Math.max(bestStreak, currentChain);
-            currentChain = 1;
-        }
-    }
-
-    bestStreak = Math.max(bestStreak, currentChain);
-
-    return {currentStreak, bestStreak};
-}
-
 async function getActivityData(ctx: Context, months?: number): Promise<TopResponse | null> {
     const serverId = ctx.interaction.guild_id!;
-    const userId = ctx.user.id;
     const monthsToCheck = months || 3;
 
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - monthsToCheck);
 
     const recentVotes = await VoteModel.find({
-        user_id: userId,
         server_id: serverId,
         is_test: false,
         createdAt: {$gte: threeMonthsAgo},
@@ -146,33 +88,23 @@ async function getActivityData(ctx: Context, months?: number): Promise<TopRespon
 
     const weekdayDistribution = new Array(7).fill(0);
     const hourlyDistribution = new Array(24).fill(0);
-    const voteTimes: Date[] = [];
+    const userVoteCounts = new Map<string, number>();
 
     for (const vote of recentVotes) {
         const voteDate = new Date(vote.createdAt!);
-        voteTimes.push(voteDate);
 
         const weekday = voteDate.getDay();
         weekdayDistribution[weekday]++;
 
         const hour = voteDate.getHours();
         hourlyDistribution[hour]++;
+
+        userVoteCounts.set(vote.user_id, (userVoteCounts.get(vote.user_id) || 0) + 1);
     }
 
-    const {currentStreak, bestStreak} = calculateStreaks(voteTimes);
-
-    const sortedTimes = voteTimes.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-    let totalGap = 0;
-    let gapCount = 0;
-
-    for (let i = 1; i < sortedTimes.length; i++) {
-        const gap = new Date(sortedTimes[i]).getTime() - new Date(sortedTimes[i - 1]).getTime();
-        totalGap += gap;
-        gapCount++;
-    }
-
-    const avgGapMs = gapCount > 0 ? totalGap / gapCount : 0;
-    const avgGapHours = avgGapMs / (1000 * 60 * 60);
+    const topVoters = Array.from(userVoteCounts.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5);
 
     const peakWeekdayIndex = weekdayDistribution.indexOf(Math.max(...weekdayDistribution));
     const peakHourIndex = hourlyDistribution.indexOf(Math.max(...hourlyDistribution));
@@ -180,7 +112,7 @@ async function getActivityData(ctx: Context, months?: number): Promise<TopRespon
     const components: MessageComponent[] = [
         {
             type: ComponentType.TextDisplay,
-            content: `# ⏰ Voting Activity`,
+            content: `# ⏰ Server Voting Activity`,
         },
     ];
 
@@ -200,9 +132,28 @@ async function getActivityData(ctx: Context, months?: number): Promise<TopRespon
             {
                 type: ComponentType.TextDisplay,
                 content: `**📈 Last ${monthsToCheck} Month${monthsToCheck > 1 ? 's' : ''}:** \`${recentVotes.length}\` votes\n` +
-                    `🔥 **Current Streak:** \`${currentStreak}\` votes | ⭐ **Best:** \`${bestStreak}\`\n` +
-                    `⏱️ **Avg Between Votes:** ${formatTimeBetweenVotes(avgGapHours)}\n` +
+                    `**Unique Voters:** \`${userVoteCounts.size}\`\n` +
                     (timeString || ''),
+            },
+        ],
+    });
+
+    components.push({
+        type: ComponentType.Separator,
+        spacing: 1,
+    });
+
+    components.push({
+        type: ComponentType.Container,
+        accent_color: 3056991,
+        components: [
+            {
+                type: ComponentType.TextDisplay,
+                content: `## 🏆 Top Voters\n` +
+                    topVoters.map((voter, index) => {
+                        const medal = index === 0 ? '🥇' : index === 1 ? '🥈' : index === 2 ? '🥉' : `${index + 1}.`;
+                        return `${medal} <@${voter[0]}> - \`${voter[1]}\` votes`;
+                    }).join('\n'),
             },
         ],
     });
@@ -217,7 +168,7 @@ async function getActivityData(ctx: Context, months?: number): Promise<TopRespon
 
     components.push({
         type: ComponentType.Container,
-        accent_color: 3056991,
+        accent_color: 5793266,
         components: [
             {
                 type: ComponentType.TextDisplay,
@@ -241,15 +192,14 @@ async function getActivityData(ctx: Context, months?: number): Promise<TopRespon
         });
     }
 
-    const maxHourlyCount = Math.max(...hourlyDistribution);
-    if (maxHourlyCount > 0 && recentVotes.length > 0) {
+    if (recentVotes.length > 0) {
         components.push({
             type: ComponentType.Container,
             accent_color: 5793266,
             components: [
                 {
                     type: ComponentType.TextDisplay,
-                    content: `### ⏰ Daily Activity\n${buildHourlyHeatmap(hourlyDistribution, maxHourlyCount)}`,
+                    content: `### ⏰ Daily Activity\n${buildHourlyHeatmap(hourlyDistribution)}`,
                 },
             ],
         });
@@ -260,14 +210,12 @@ async function getActivityData(ctx: Context, months?: number): Promise<TopRespon
 
 async function getPlatformData(ctx: Context, months?: number): Promise<TopResponse | null> {
     const serverId = ctx.interaction.guild_id!;
-    const userId = ctx.user.id;
     const monthsToCheck = months || 3;
 
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - monthsToCheck);
 
     const recentVotes = await VoteModel.find({
-        user_id: userId,
         server_id: serverId,
         is_test: false,
         createdAt: {$gte: threeMonthsAgo},
@@ -290,7 +238,7 @@ async function getPlatformData(ctx: Context, months?: number): Promise<TopRespon
     const components: MessageComponent[] = [
         {
             type: ComponentType.TextDisplay,
-            content: `# 🌐 Platform Statistics`,
+            content: `# 🌐 Server Platform Statistics`,
         },
         {
             type: ComponentType.Container,
@@ -314,7 +262,7 @@ async function getPlatformData(ctx: Context, months?: number): Promise<TopRespon
         const p = platforms[i];
         const percentage = recentVotes.length > 0 ? Math.round((p.count / recentVotes.length) * 100) : 0;
         const barLength = Math.round((percentage / 100) * 15);
-        const bar = '█'.repeat(barLength);
+        const bar = '█'.repeat(barLength) + '░'.repeat(15 - barLength);
 
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
 
@@ -324,7 +272,7 @@ async function getPlatformData(ctx: Context, months?: number): Promise<TopRespon
             components: [
                 {
                     type: ComponentType.TextDisplay,
-                    content: `${medal} **${p.platform}**\n\`${p.count}\` votes (\`${percentage}%\`) ${bar}`,
+                    content: `${medal} **${p.platform}**\n\`${p.count}\` votes (\`${percentage}%\`)\n${bar}`,
                 },
             ],
         });
@@ -335,14 +283,12 @@ async function getPlatformData(ctx: Context, months?: number): Promise<TopRespon
 
 async function getEntitiesData(ctx: Context, months?: number): Promise<TopResponse | null> {
     const serverId = ctx.interaction.guild_id!;
-    const userId = ctx.user.id;
     const monthsToCheck = months || 3;
 
     const threeMonthsAgo = new Date();
     threeMonthsAgo.setMonth(threeMonthsAgo.getMonth() - monthsToCheck);
 
     const recentVotes = await VoteModel.find({
-        user_id: userId,
         server_id: serverId,
         is_test: false,
         createdAt: {$gte: threeMonthsAgo},
@@ -371,7 +317,7 @@ async function getEntitiesData(ctx: Context, months?: number): Promise<TopRespon
             const setting = settingsMap.get(entityId);
 
             let entityName = entityType;
-            if (setting) {
+            if (entityId) {
                 if (entityType === 'bot') {
                     entityName = `<@${entityId}>`;
                 } else if (entityType === 'server') {
@@ -388,7 +334,7 @@ async function getEntitiesData(ctx: Context, months?: number): Promise<TopRespon
     const components: MessageComponent[] = [
         {
             type: ComponentType.TextDisplay,
-            content: `# 🎯 Entity Statistics`,
+            content: `# 🎯 Server Entity Statistics`,
         },
         {
             type: ComponentType.Container,
@@ -412,7 +358,7 @@ async function getEntitiesData(ctx: Context, months?: number): Promise<TopRespon
         const entity = entityBreakdown[i];
         const percentage = recentVotes.length > 0 ? Math.round((entity.count / recentVotes.length) * 100) : 0;
         const barLength = Math.round((percentage / 100) * 15);
-        const bar = '█'.repeat(barLength);
+        const bar = '█'.repeat(barLength) + '░'.repeat(15 - barLength);
 
         const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : `${i + 1}.`;
         const typeIcon = entity.entityType === 'bot' ? '🤖' : entity.entityType === 'game' ? '🎮' : '🖥️';
@@ -423,7 +369,7 @@ async function getEntitiesData(ctx: Context, months?: number): Promise<TopRespon
             components: [
                 {
                     type: ComponentType.TextDisplay,
-                    content: `${medal} ${typeIcon} **${entity.entityName}**\n\`${entity.count}\` votes (\`${percentage}%\`) ${bar}`,
+                    content: `${medal} ${typeIcon} **${entity.entityName}**\n\`${entity.count}\` votes (\`${percentage}%\`)\n${bar}`,
                 },
             ],
         });
@@ -439,18 +385,12 @@ async function getEntitiesData(ctx: Context, months?: number): Promise<TopRespon
     return {components};
 }
 
-function buildNoVotesComponents(subcommand: string): TopResponse {
-    const messages = {
-        activity: 'voting activity data',
-        platform: 'platform statistics',
-        entities: 'entity statistics',
-    };
-
+function buildNoVotesComponents(): TopResponse {
     return {
         components: [
             {
                 type: ComponentType.TextDisplay,
-                content: `# 📊 No Data Found`,
+                content: `# 📊 No Server Data Found`,
             },
             {
                 type: ComponentType.Container,
@@ -458,7 +398,7 @@ function buildNoVotesComponents(subcommand: string): TopResponse {
                 components: [
                     {
                         type: ComponentType.TextDisplay,
-                        content: `## No Votes Yet\n\nYou haven't voted for any entity in this server in the last 3 months!\n\n> 💡 Use \`/setup\` to configure vote tracking and start earning rewards!`,
+                        content: `## No Votes Yet\n\nThis server doesn't have any votes recorded in the last 3 months!\n\n> 💡 Use \`/setup\` to configure vote tracking and start earning rewards!`,
                     },
                 ],
             },
@@ -469,19 +409,19 @@ function buildNoVotesComponents(subcommand: string): TopResponse {
 export default class TopCommand implements Command {
     data = {
         name: 'top',
-        description: 'View your voting statistics',
+        description: 'View server-wide voting statistics',
         integration_types: [ApplicationIntegrationType.GuildInstall],
         contexts: [InteractionContextType.Guild],
         options: [
             {
                 name: 'activity',
-                description: 'View your voting activity patterns and streaks',
-                type: 1, // SUB_COMMAND
+                description: 'View server-wide voting activity patterns',
+                type: 1,
                 options: [
                     {
                         name: 'months',
                         description: 'Number of months to look back (default: 3)',
-                        type: 4, // INTEGER
+                        type: 4,
                         min_value: 1,
                         max_value: 12,
                     } as APIApplicationCommandIntegerOption,
@@ -489,13 +429,13 @@ export default class TopCommand implements Command {
             },
             {
                 name: 'platform',
-                description: 'View your platform voting statistics',
-                type: 1, // SUB_COMMAND
+                description: 'View server-wide platform voting statistics',
+                type: 1,
                 options: [
                     {
                         name: 'months',
                         description: 'Number of months to look back (default: 3)',
-                        type: 4, // INTEGER
+                        type: 4,
                         min_value: 1,
                         max_value: 12,
                     } as APIApplicationCommandIntegerOption,
@@ -503,13 +443,13 @@ export default class TopCommand implements Command {
             },
             {
                 name: 'entities',
-                description: 'View your entity voting statistics',
-                type: 1, // SUB_COMMAND
+                description: 'View server-wide entity voting statistics',
+                type: 1,
                 options: [
                     {
                         name: 'months',
                         description: 'Number of months to look back (default: 3)',
-                        type: 4, // INTEGER
+                        type: 4,
                         min_value: 1,
                         max_value: 12,
                     } as APIApplicationCommandIntegerOption,
@@ -518,7 +458,7 @@ export default class TopCommand implements Command {
         ],
     };
 
-    async execute(ctx: Context, additional?: Record<string, any>) {
+    async execute(ctx: Context) {
         if (!ctx.isInGuild) {
             return ctx.reply({
                 content: 'This command can only be used in a server.',
@@ -560,7 +500,7 @@ export default class TopCommand implements Command {
 
             if (!data) {
                 return ctx.editReply({
-                    ...buildNoVotesComponents(subcommandName),
+                    ...buildNoVotesComponents(),
                     flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
                 });
             }
@@ -584,7 +524,7 @@ export default class TopCommand implements Command {
                         components: [
                             {
                                 type: ComponentType.TextDisplay,
-                                content: 'An error occurred while fetching your statistics. Please try again later.',
+                                content: 'An error occurred while fetching server statistics. Please try again later.',
                             },
                         ],
                     },

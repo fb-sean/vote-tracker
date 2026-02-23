@@ -40,6 +40,7 @@ import {
     handleListToggleDisable,
     handleListToggleEnable,
 } from "@Handlers/ListHandlers";
+import {handleMeView} from "@Handlers/MeHandlers";
 import {getAllSetupsForServer, buildSetupList} from "@Utils/SetupManager";
 import {errorComponent} from "@Utils/Components";
 
@@ -100,6 +101,10 @@ export default class InteractionRoute implements TRoute {
 
             if (parts[0] === 'help') {
                 return this.handleHelpComponent(ctx, parts);
+            }
+
+            if (parts[0] === 'me') {
+                return this.handleMeComponent(ctx, parts);
             }
 
             const button = DiscordClient.getInstance().getButton(parts[0]);
@@ -420,6 +425,22 @@ export default class InteractionRoute implements TRoute {
             }
         } catch (error) {
             Logger.error(`Error handling help component ${action}: ${error}`, 'HELP');
+            console.log(error);
+
+            return ctx.reply({content: 'An error occurred while processing your request.'});
+        }
+    }
+
+    async handleMeComponent(ctx: Context, parts: string[]) {
+        try {
+            if (parts[1] === 'view') {
+                const view = parts[2];
+                return handleMeView(ctx, view);
+            }
+
+            return ctx.reply({content: 'Unknown me action.'});
+        } catch (error) {
+            Logger.error(`Error handling me component: ${error}`, 'ME');
             console.log(error);
 
             return ctx.reply({content: 'An error occurred while processing your request.'});
