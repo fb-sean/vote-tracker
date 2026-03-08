@@ -1,15 +1,19 @@
 import {Context} from "@Utils/Context";
 import {
-    APIMessageChannelSelectInteractionData, APIModalSubmitInteraction, APIUserInteractionDataResolved,
-    ComponentType,
-    MessageFlags, RESTGetAPIChannelMessageResult,
+    APIMessageChannelSelectInteractionData,
+    APIModalSubmitInteraction,
+    MessageFlags,
+    RESTGetAPIChannelMessageResult,
     RESTPostAPIChannelMessageJSONBody,
+    RESTPostAPIChannelMessageResult,
     Routes,
 } from "discord-api-types/v10";
 import {DiscordClient} from "@API/DiscordClient";
 import {
     checkForDuplicateEntityId,
-    countSetupsForServer, defaultFirstVote, defaultVote,
+    countSetupsForServer,
+    defaultFirstVote,
+    defaultVote,
     deleteSetupState,
     getSetupState,
     nextStep,
@@ -146,6 +150,8 @@ export async function handleSetupNext(ctx: Context, setupId: string) {
                         await delay(1000);
 
                         await DiscordClient.getInstance().rest.delete(Routes.channelMessage(state.channel_id, message.id));
+
+                        await Redis.getInstance().delete(`discord:vt:channel_no_perms:${state.channel_id}`);
                     } catch (e) {
 
                     }
@@ -246,9 +252,21 @@ export async function handleSetupTestChannel(ctx: Context, setupId: string) {
     await Redis.getInstance().set('discord:vt:test:cooldown:' + state.channel_id, true, 30)
 
     try {
-        await DiscordClient.getInstance().rest.post(Routes.channelMessages(state.channel_id), {
+        const message = await DiscordClient.getInstance().rest.post(Routes.channelMessages(state.channel_id), {
             body: infoComponent('Votes - Setup Wizard', 'If you see this message, the test was successful!'),
-        });
+        }) as RESTPostAPIChannelMessageResult;
+
+        if (message && message.id) {
+            try {
+                await delay(1000);
+
+                await DiscordClient.getInstance().rest.delete(Routes.channelMessage(state.channel_id, message.id));
+
+                await Redis.getInstance().delete(`discord:vt:channel_no_perms:${state.channel_id}`);
+            } catch (e) {
+
+            }
+        }
 
         return ctx.reply(successComponent('Votes - Setup Wizard', 'Sent the test message successfully.'));
     } catch (error) {

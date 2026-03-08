@@ -25,6 +25,7 @@ class RedisQueue {
             this._queues.set(
                 jobName,
                 new Queue(jobName, {
+                    // @ts-ignore
                     connection: this._redis,
                 })
             );
@@ -46,6 +47,7 @@ class RedisQueue {
             this._queues.set(
                 jobName,
                 new Queue(jobName, {
+                    // @ts-ignore
                     connection: this._redis,
                 })
             );
@@ -59,6 +61,7 @@ class RedisQueue {
                 }
             },
             {
+                // @ts-ignore
                 connection: this._redis,
                 concurrency: concurrency,
                 limiter: {

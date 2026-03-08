@@ -33,6 +33,12 @@
       ],
       "@Handlers/*": [
         "src/Handlers/*"
+      ],
+      "@Services/*": [
+        "src/Services/*"
+      ],
+      "@Renderers/*": [
+        "src/Renderers/*"
       ]
     }
   },
