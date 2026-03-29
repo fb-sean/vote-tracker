@@ -303,7 +303,6 @@ async function getEntitiesData(ctx: Context, months?: number): Promise<TopRespon
         disabled: false,
     });
 
-    const settingsMap = new Map(settings.map(s => [s.entity_id, s]));
     const entityStats = new Map<string, number>();
 
     for (const vote of recentVotes) {
@@ -314,7 +313,6 @@ async function getEntitiesData(ctx: Context, months?: number): Promise<TopRespon
     const entityBreakdown = Array.from(entityStats.entries())
         .map(([key, count]) => {
             const [entityType, entityId] = key.split('_');
-            const setting = settingsMap.get(entityId);
 
             let entityName = entityType;
             if (entityId) {
