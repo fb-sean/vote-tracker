@@ -1063,7 +1063,7 @@ export function buildCompleteStep(setupId: string, state: TSetupState): RESTPost
 }
 
 export function buildPlatformTopGGGuide(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string, hasExistingConnection = false): RESTPostAPIChannelMessageJSONBody {
-    const entityType = state.entity_type === 'bot' ? 'bot' : state.entity_type === 'server' ? 'server' : 'roblox/games';
+    const entityType = state.entity_type === 'bot' ? 'bot' : state.entity_type === 'server' ? 'servers' : 'roblox/games';
     const entityId = state.entity_id || '';
     const isGame = state.entity_type === 'game';
 

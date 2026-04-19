@@ -72,7 +72,7 @@ export default class SendMessageWorker implements TWorker {
             // legacy
             'topgg': {
                 'bot': 'https://top.gg/bot/' + platform.entity_id + '/vote',
-                'server': 'https://top.gg/server/' + platform.entity_id + '/vote',
+                'server': 'https://top.gg/servers/' + platform.entity_id + '/vote',
                 'game': 'https://top.gg/roblox/game/' + platform.entity_id + '/vote',
             },
             'dbl': {
