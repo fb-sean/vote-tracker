@@ -406,6 +406,7 @@ export default class LeaderboardCommand implements Command {
             return ctx.reply({
                 ...buildLeaderboardComponents(topUsers, sortedUsers, entityName, sort, userStats, ctx.user.id),
                 flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
+                allowed_mentions: {parse: []}
             });
         } catch (error) {
             console.error('Error in /leaderboard command:', error);
