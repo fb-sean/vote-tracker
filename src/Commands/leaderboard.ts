@@ -251,7 +251,7 @@ export default class LeaderboardCommand implements Command {
         ],
     };
 
-    async execute(ctx: Context, additional?: Record<string, any>) {
+    async execute(ctx: Context) {
         if (!ctx.isInGuild) {
             return ctx.reply({
                 content: 'This command can only be used in a server.',
@@ -260,8 +260,8 @@ export default class LeaderboardCommand implements Command {
         }
 
         const serverId = ctx.interaction.guild_id!;
-        const entityId = additional?.entity;
-        const sort: LeaderboardSort = additional?.sort || 'votes';
+        const entityId = ctx.getOptionValue('entity');
+        const sort: LeaderboardSort = ctx.getOptionValue<LeaderboardSort>('sort') || 'votes';
 
         try {
             const settings = await SettingsModel.find({
@@ -432,7 +432,7 @@ export default class LeaderboardCommand implements Command {
         }
     }
 
-    async autocomplete(ctx: Context, additional?: Record<string, any>) {
+    async autocomplete(ctx: Context) {
         if (!ctx.isInGuild) {
             return ctx.autocomplete([]);
         }

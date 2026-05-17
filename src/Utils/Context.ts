@@ -208,7 +208,7 @@ export class Context {
         });
     }
 
-    getOptionValue(name: string): Nullable<string> {
+    getOptionValue<T extends string>(name: string): Nullable<T> {
         let value = null;
 
         const data = this.interaction.data as APIChatInputApplicationCommandInteractionData;

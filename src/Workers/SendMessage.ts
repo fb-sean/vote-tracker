@@ -99,7 +99,7 @@ export default class SendMessageWorker implements TWorker {
             'user.id': payload.user_id,
             'user.username': payload.user_data?.username || 'Unknown',
             'user.avatar': payload.user_data?.avatar || '',
-            'user.avatar.animated': payload.user_data?.avatar.startsWith('a_') ? '?anmiated=true' : '',
+            'user.avatar.animated': payload.user_data?.avatar.startsWith('a_') ? '?animated=true' : '',
             'votes.count.all': payload.vote_counts.all,
             'votes.count.month': payload.vote_counts.month,
             'votes.count.year': payload.vote_counts.year,
@@ -115,28 +115,25 @@ export default class SendMessageWorker implements TWorker {
         };
 
         try {
-            const parsed = JSON.parse(this.replacePlaceholders(messageRaw, placeholders));
+            const parsed = JSON.parse(messageRaw);
+            const replaced = this.replacePlaceholdersInObject(parsed, placeholders);
 
-            if (Array.isArray(parsed)) {
+            if (Array.isArray(replaced)) {
                 return {
-                    components: parsed,
+                    components: replaced,
                     flags: MessageFlags.SuppressNotifications | MessageFlags.IsComponentsV2,
                 };
             }
 
-            if (parsed.content) {
-                parsed.content = this.replacePlaceholders(parsed.content as string, placeholders);
-            }
-
-            if (parsed.components && !parsed.content && !parsed.embeds) {
-                const flags = parsed.flags || 0;
+            if (replaced.components && !replaced.content && !replaced.embeds) {
+                const flags = replaced.flags || 0;
 
                 if (!(flags & MessageFlags.IsComponentsV2)) {
-                    parsed.flags = flags | MessageFlags.IsComponentsV2;
+                    replaced.flags = flags | MessageFlags.IsComponentsV2;
                 }
             }
 
-            return parsed;
+            return replaced;
         } catch {
             return {
                 content: this.replacePlaceholders(messageRaw, placeholders),
@@ -153,9 +150,31 @@ export default class SendMessageWorker implements TWorker {
             result = result.replaceAll(placeholder, String(value));
         }
 
-        result.replaceAll('\\n', '\n');
+        result = result.replaceAll('\\n', '\n');
 
         return result;
+    }
+
+    private replacePlaceholdersInObject(obj: unknown, placeholders: IMessagePlaceholders): any {
+        if (typeof obj === 'string') {
+            return this.replacePlaceholders(obj, placeholders);
+        }
+
+        if (Array.isArray(obj)) {
+            return obj.map(item => this.replacePlaceholdersInObject(item, placeholders));
+        }
+
+        if (obj !== null && typeof obj === 'object') {
+            const result: Record<string, unknown> = {};
+
+            for (const [key, value] of Object.entries(obj)) {
+                result[key] = this.replacePlaceholdersInObject(value, placeholders);
+            }
+
+            return result;
+        }
+
+        return obj;
     }
 
     private async sendWithRateLimit(channelId: string, message: Record<string, unknown>): Promise<void> {
@@ -166,6 +185,7 @@ export default class SendMessageWorker implements TWorker {
 
         if (hasNoPerms === 'true') {
             Logger.warn(`Channel ${channelId} has no permissions (cached), skipping`, 'SEND_MESSAGE');
+
             return;
         }
 
