@@ -259,6 +259,10 @@ export default class LeaderboardCommand implements Command {
             });
         }
 
+        await ctx.deferReply({
+            flags: MessageFlags.Ephemeral,
+        });
+
         const serverId = ctx.interaction.guild_id!;
         const entityId = ctx.getOptionValue('entity');
         const sort: LeaderboardSort = ctx.getOptionValue<LeaderboardSort>('sort') || 'votes';
@@ -270,7 +274,7 @@ export default class LeaderboardCommand implements Command {
             });
 
             if (settings.length === 0) {
-                return ctx.reply({
+                return ctx.editReply({
                     ...buildNoSetupComponents(),
                     flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
                 });
@@ -281,7 +285,7 @@ export default class LeaderboardCommand implements Command {
                 : settings.map(s => s.entity_id);
 
             if (entityIds.length === 0) {
-                return ctx.reply({
+                return ctx.editReply({
                     components: [
                         {
                             type: ComponentType.TextDisplay,
@@ -309,7 +313,7 @@ export default class LeaderboardCommand implements Command {
             }).sort({createdAt: 1});
 
             if (votes.length === 0) {
-                return ctx.reply({
+                return ctx.editReply({
                     ...buildNoVotesComponents(),
                     flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
                 });
@@ -403,7 +407,7 @@ export default class LeaderboardCommand implements Command {
                         : 'Server'
                 : 'All Entities';
 
-            return ctx.reply({
+            return ctx.editReply({
                 ...buildLeaderboardComponents(topUsers, sortedUsers, entityName, sort, userStats, ctx.user.id),
                 flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
                 allowed_mentions: {parse: []}
@@ -411,7 +415,7 @@ export default class LeaderboardCommand implements Command {
         } catch (error) {
             console.error('Error in /leaderboard command:', error);
 
-            return ctx.reply({
+            return ctx.editReply({
                 components: [
                     {
                         type: ComponentType.TextDisplay,
