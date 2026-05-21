@@ -107,6 +107,7 @@ export default class WebhookTopGGRoute implements TRoute {
         await RedisQueue.getInstance().addJob(EWorkerJobs.ComputeVote, mappedData);
 
         Logger.info(`Vote queued for processing`, 'TOPGG');
+
         return Response(res, {message: 'Vote received'});
     }
 }

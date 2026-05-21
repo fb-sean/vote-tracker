@@ -56,6 +56,7 @@ export default class WebhookDBLRoute implements TRoute {
         });
 
         Logger.info(`Vote queued for processing`, 'DBL');
+
         return Response(res, {message: 'Vote received'});
     }
 }

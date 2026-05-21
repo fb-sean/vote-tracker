@@ -11,8 +11,8 @@ import {
     APIContainerComponent,
     APISeparatorComponent,
 } from "discord-api-types/v10";
-import VoteModel from "@Schemas/Vote";
 import SettingsModel from "@Schemas/Settings";
+import StreakService from "../Utils/StreakService";
 
 type LeaderboardSort = 'votes' | 'streak' | 'best_streak';
 
@@ -306,13 +306,26 @@ export default class LeaderboardCommand implements Command {
                 } as LeaderboardResponse);
             }
 
-            const votes = await VoteModel.find({
-                server_id: serverId,
-                entity_id: {$in: entityIds},
-                is_test: false,
-            }).sort({createdAt: 1});
+            // Determine if we're filtering by a specific entity or showing all
+            const isEntityFilter = entityId && entityIds.length === 1;
+            const targetEntityId = isEntityFilter ? entityId : null;
+            const targetEntityType = isEntityFilter
+                ? settings.find(s => s.entity_id === entityId)?.entity_type || null
+                : null;
 
-            if (votes.length === 0) {
+            let streakDataMap: Map<string, { current: number; best: number; voteCount: number }>;
+
+            if (isEntityFilter && targetEntityId && targetEntityType) {
+                streakDataMap = await StreakService.getEntityStreaksForEntity(targetEntityId, targetEntityType);
+            } else {
+                const entityRefs = settings
+                    .filter(s => s.entity_id && s.entity_type)
+                    .map(s => ({entityId: s.entity_id!, entityType: s.entity_type!}));
+
+                streakDataMap = await StreakService.getAggregatedEntityStreaksForEntities(entityRefs);
+            }
+
+            if (streakDataMap.size === 0) {
                 return ctx.editReply({
                     ...buildNoVotesComponents(),
                     flags: MessageFlags.Ephemeral | MessageFlags.IsComponentsV2,
@@ -321,78 +334,20 @@ export default class LeaderboardCommand implements Command {
 
             const userStats = new Map<string, LeaderboardEntry>();
 
-            for (const vote of votes) {
-                if (!userStats.has(vote.user_id)) {
-                    userStats.set(vote.user_id, {
-                        userId: vote.user_id,
-                        count: 0,
-                        streak: 0,
-                        bestStreak: 0,
-                        lastVote: null,
-                    });
-                }
-
-                const stat = userStats.get(vote.user_id)!;
-                stat.count++;
-                stat.lastVote = vote.createdAt!;
-            }
-
-            for (const [userId, stat] of userStats) {
-                const userVotes = votes.filter(v => v.user_id === userId).sort((a, b) =>
-                    new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime()
-                );
-
-                let currentStreak = 0;
-                let streakCheckTime = Date.now();
-                const streakWindow = 48 * 60 * 60 * 1000;
-
-                for (let i = userVotes.length - 1; i >= 0; i--) {
-                    const vote = userVotes[i];
-                    const voteTime = new Date(vote.createdAt).getTime();
-
-                    if (streakCheckTime - voteTime > streakWindow) {
-                        if (i < userVotes.length - 1) {
-                            const nextVote = userVotes[i + 1];
-                            const nextVoteTime = new Date(nextVote.createdAt).getTime();
-
-                            if (nextVoteTime - voteTime > streakWindow) {
-                                break;
-                            }
-                        } else {
-                            break;
-                        }
-                    }
-
-                    currentStreak++;
-
-                    streakCheckTime = voteTime;
-                }
-
-                stat.streak = currentStreak;
-
-                let bestStreak = 1;
-                let currentChain = 1;
-
-                for (let i = 1; i < userVotes.length; i++) {
-                    const prevVote = userVotes[i - 1];
-                    const currVote = userVotes[i];
-                    const timeDiff = new Date(currVote.createdAt).getTime() - new Date(prevVote.createdAt).getTime();
-
-                    if (timeDiff <= streakWindow) {
-                        currentChain++;
-                    } else {
-                        bestStreak = Math.max(bestStreak, currentChain);
-                        currentChain = 1;
-                    }
-                }
-
-                stat.bestStreak = Math.max(bestStreak, currentChain);
+            for (const [userId, streakInfo] of streakDataMap) {
+                userStats.set(userId, {
+                    userId,
+                    count: streakInfo.voteCount,
+                    streak: streakInfo.current,
+                    bestStreak: streakInfo.best,
+                    lastVote: null, // Not needed for display, would require extra query
+                });
             }
 
             const sortedUsers = Array.from(userStats.values()).sort((a, b) => {
                 if (sort === 'votes') return b.count - a.count;
                 if (sort === 'streak') return b.streak - a.streak;
-                if (sort === 'best_streak') return b.bestStreak - b.bestStreak;
+                if (sort === 'best_streak') return b.bestStreak - a.bestStreak;
 
                 return 0;
             });

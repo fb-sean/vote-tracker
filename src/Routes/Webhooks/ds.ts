@@ -54,6 +54,7 @@ export default class WebhookDiscordsRoute implements TRoute {
         });
 
         Logger.info(`Vote queued for processing`, 'Discords');
+
         return Response(res, {message: 'Vote received'});
     }
 }

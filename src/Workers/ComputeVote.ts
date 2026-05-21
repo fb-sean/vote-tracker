@@ -7,6 +7,7 @@ import {Routes} from "discord-api-types/v10";
 import Redis from "@API/RedisCache";
 import RedisQueue from "@API/RedisQueue";
 import Logger from "@Utils/Logger";
+import StreakService from "../Utils/StreakService";
 import type {IComputeVotePayload, IVoteCounts, IStreakData, IUserData, ISendMessagePayload} from "@Types/Workers";
 
 export default class ComputeVoteWorker implements TWorker {
@@ -40,11 +41,23 @@ export default class ComputeVoteWorker implements TWorker {
                     is_test: data.type === 'test',
                 });
 
-                const [voteCounts, streakData, isFirstVote] = await Promise.all([
+                const entityStreak = await StreakService.updateEntityStreak(
+                    data.user_id, data.entity_id, data.entity_type
+                );
+
+                const [voteCounts] = await Promise.all([
                     this.getVoteCounts(data),
-                    this.getStreakData(data),
-                    this.checkIsFirstVote(data),
                 ]);
+
+                const isFirstVote = entityStreak.voteCount <= 1;
+
+                const streakData: IStreakData = {
+                    current: entityStreak.current,
+                    best: entityStreak.best,
+                    last: entityStreak.previousVoteAt
+                        ? ~~(entityStreak.previousVoteAt.getTime() / 1000)
+                        : Date.now(),
+                };
 
                 const userData = await this.getOrFetchUserData(data);
                 const userExistsInGuild = await this.checkUserInGuild(setting.server_id!, data.user_id);
@@ -150,144 +163,6 @@ export default class ComputeVoteWorker implements TWorker {
         ]);
 
         return {all, month, year, week};
-    }
-
-    private async getStreakData(payload: IComputeVotePayload): Promise<IStreakData> {
-        const userVotes = await VoteModel.find({
-            user_id: payload.user_id,
-            entity_id: payload.entity_id,
-            entity_type: payload.entity_type,
-            is_test: false,
-        }).sort({createdAt: 1}).limit(1);
-
-        if (!userVotes || userVotes.length === 0) {
-            return {
-                current: 1,
-                best: 1,
-                last: Date.now(),
-            };
-        }
-
-        const current = await this.calculateCurrentStreak(payload);
-        const streakGroups = await this.getStreakGroups(payload);
-        const best = streakGroups.length > 0 ? Math.max(...streakGroups) : 1;
-
-        const last = await VoteModel
-            .findOne({
-                user_id: payload.user_id,
-                entity_id: payload.entity_id,
-                entity_type: payload.entity_type,
-                is_test: false,
-            })
-            .sort({createdAt: -1})
-            .skip(1)
-            .limit(1);
-
-        return {
-            current,
-            best,
-            last: last ? ~~((new Date(last.createdAt)).getTime() / 1000) : Date.now(),
-        };
-    }
-
-    private async calculateCurrentStreak(payload: IComputeVotePayload): Promise<number> {
-        const votes = await VoteModel.find({
-            user_id: payload.user_id,
-            entity_id: payload.entity_id,
-            entity_type: payload.entity_type,
-            is_test: false,
-        }).sort({createdAt: -1}).limit(1);
-
-        if (!votes || votes.length === 0) {
-            return 1;
-        }
-
-        const now = Date.now();
-        const voteTime = new Date(votes[0].createdAt).getTime();
-        const oneDay = 24 * 60 * 60 * 1000;
-
-        if (now - voteTime > 2 * oneDay) {
-            return 1;
-        }
-
-        let streak = 1;
-        let checkDate = new Date(voteTime);
-        checkDate.setDate(checkDate.getDate() - 1);
-
-        while (true) {
-            const dayStart = new Date(checkDate);
-            dayStart.setHours(0, 0, 0, 0);
-            const dayEnd = new Date(checkDate);
-            dayEnd.setHours(23, 59, 59, 999);
-
-            const voteInDay = await VoteModel.findOne({
-                user_id: payload.user_id,
-                entity_id: payload.entity_id,
-                entity_type: payload.entity_type,
-                is_test: false,
-                createdAt: {$gte: dayStart, $lte: dayEnd},
-            });
-
-            if (voteInDay) {
-                streak++;
-                checkDate.setDate(checkDate.getDate() - 1);
-            } else {
-                break;
-            }
-        }
-
-        return streak;
-    }
-
-    private async getStreakGroups(payload: IComputeVotePayload): Promise<number[]> {
-        const votes = await VoteModel.find({
-            user_id: payload.user_id,
-            entity_id: payload.entity_id,
-            entity_type: payload.entity_type,
-            is_test: false,
-        }).sort({createdAt: 1});
-
-        if (!votes || votes.length === 0) {
-            return [];
-        }
-
-        const groups: number[][] = [];
-        let currentGroup: number[] = [];
-
-        for (let i = 0; i < votes.length; i++) {
-            const voteTime = new Date(votes[i].createdAt).getTime();
-            const oneDay = 24 * 60 * 60 * 1000;
-
-            if (currentGroup.length === 0) {
-                currentGroup.push(voteTime);
-                continue;
-            }
-
-            const lastTime = currentGroup[currentGroup.length - 1];
-            if (voteTime - lastTime <= oneDay * 2) {
-                currentGroup.push(voteTime);
-            } else {
-                groups.push(currentGroup);
-                currentGroup = [voteTime];
-            }
-        }
-
-        if (currentGroup.length > 0) {
-            groups.push(currentGroup);
-        }
-
-        return groups.map(g => g.length);
-    }
-
-    private async checkIsFirstVote(payload: IComputeVotePayload): Promise<boolean> {
-        const existingVote = await VoteModel.exists({
-            user_id: payload.user_id,
-            entity_id: payload.entity_id,
-            entity_type: payload.entity_type,
-            is_test: false,
-        });
-
-        return existingVote ? false : true;
     }
 
     private async getOrFetchUserData(payload: IComputeVotePayload): Promise<IUserData | null> {

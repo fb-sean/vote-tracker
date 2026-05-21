@@ -8,6 +8,7 @@ import {
 } from "discord-api-types/v10";
 import VoteModel from "@Schemas/Vote";
 import SettingsModel from "@Schemas/Settings";
+import StreakService from "../Utils/StreakService";
 import Logger from "@Utils/Logger";
 
 type MessageComponent = any;
@@ -26,53 +27,6 @@ function formatTimeBetweenVotes(avgHours: number): string {
 
         return `${days} day${days !== 1 ? 's' : ''}`;
     }
-}
-
-function calculateStreaks(votes: Date[]): { currentStreak: number; bestStreak: number } {
-    const streakWindow = 48 * 60 * 60 * 1000;
-    const sortedVotes = votes.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
-
-    let currentStreak = 0;
-    let streakCheckTime = Date.now();
-
-    for (let i = sortedVotes.length - 1; i >= 0; i--) {
-        const voteTime = new Date(sortedVotes[i]).getTime();
-
-        if (streakCheckTime - voteTime > streakWindow) {
-            if (i < sortedVotes.length - 1) {
-                const nextVoteTime = new Date(sortedVotes[i + 1]).getTime();
-
-                if (nextVoteTime - voteTime > streakWindow) {
-                    break;
-                }
-            } else {
-                break;
-            }
-        }
-
-        currentStreak++;
-        streakCheckTime = voteTime;
-    }
-
-    let bestStreak = 1;
-    let currentChain = 1;
-
-    for (let i = 1; i < sortedVotes.length; i++) {
-        const prevVote = new Date(sortedVotes[i - 1]).getTime();
-        const currVote = new Date(sortedVotes[i]).getTime();
-        const timeDiff = currVote - prevVote;
-
-        if (timeDiff <= streakWindow) {
-            currentChain++;
-        } else {
-            bestStreak = Math.max(bestStreak, currentChain);
-            currentChain = 1;
-        }
-    }
-
-    bestStreak = Math.max(bestStreak, currentChain);
-
-    return {currentStreak, bestStreak};
 }
 
 export default class MeCommand implements Command {
@@ -151,7 +105,10 @@ export default class MeCommand implements Command {
                 platformStats.set(vote.platform, (platformStats.get(vote.platform) || 0) + 1);
             }
 
-            const {currentStreak, bestStreak} = calculateStreaks(voteTimes);
+            const entityRefs = settings
+                .filter(s => s.entity_id && s.entity_type)
+                .map(s => ({ entityId: s.entity_id!, entityType: s.entity_type! }));
+            const serverStreak = await StreakService.getAggregatedEntityStreak(userId, entityRefs);
 
             const sortedTimes = voteTimes.sort((a, b) => new Date(a).getTime() - new Date(b).getTime());
             let totalGap = 0;
@@ -212,7 +169,7 @@ export default class MeCommand implements Command {
                     {
                         type: ComponentType.TextDisplay,
                         content: `**📈 Last 3 Months:** \`${recentVotes.length}\` votes\n` +
-                            `🔥 **Current Streak:** \`${currentStreak}\` | ⭐ **Best:** \`${bestStreak}\`\n` +
+                            `🔥 **Current Streak:** \`${serverStreak.current}\` | ⭐ **Best:** \`${serverStreak.best}\`\n` +
                             `⏱️ **Avg Between Votes:** ${formatTimeBetweenVotes(avgGapHours)}\n` +
                             (timeString || ''),
                     },
