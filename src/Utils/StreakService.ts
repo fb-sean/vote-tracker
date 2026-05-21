@@ -1,6 +1,6 @@
-import EntityStreakModel from 'src/Schemas/EntityStreak';
-import VoteModel from 'src/Schemas/Vote';
-import Logger from 'src/Utils/Logger';
+import EntityStreakModel from '@Schemas/EntityStreak';
+import VoteModel from '@Schemas/Vote';
+import Logger from '@Utils/Logger';
 import {IEntityRef, ILightweightStreakData, IStreakData} from "@Types/Streak";
 
 const STREAK_WINDOW_MS = 26 * 60 * 60 * 1000; // 26 hours
