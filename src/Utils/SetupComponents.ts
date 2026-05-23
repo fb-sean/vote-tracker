@@ -1158,7 +1158,7 @@ export function buildPlatformTopGGGuide(setupId: string, state: TSetupState, web
                         items: [
                             {
                                 media: {
-                                    url: 'https://media.discordapp.net/attachments/843258152802844703/1473030700168122408/image.png'
+                                    url: 'https://cdn.antifa.gg/Milkweedbug/yGA4lh4Su2'
                                 }
                             }
                         ]
@@ -1172,7 +1172,7 @@ export function buildPlatformTopGGGuide(setupId: string, state: TSetupState, web
                         items: [
                             {
                                 media: {
-                                    url: 'https://media.discordapp.net/attachments/843258152802844703/1473030947535327324/image.png'
+                                    url: 'https://cdn.antifa.gg/Neonredguppy/VQFLat9Sda'
                                 }
                             }
                         ]
