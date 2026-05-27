@@ -70,22 +70,13 @@ export default class WebhookTopGGRoute implements TRoute {
         const type = req.body.type;
         const data = req.body.data;
 
-        let parsedQuery: Record<string, string> = {};
-        if (data.query) {
-            try {
-                parsedQuery = Object.fromEntries(new URLSearchParams(data.query));
-            } catch (error) {
-                Logger.error(`Failed to parse query parameters: ${error}`, 'TOPGG');
-            }
-        }
-
         const mappedData = {
             type: type === 'webhook.test' ? 'test' : 'vote',
             user_id: data.user.platform_id,
             entity_id: data.project.platform_id,
             entity_type: data.project.type,
             platform: 'Top.gg',
-            guild_id: parsedQuery?.guild_id || parsedQuery?.guildId || parsedQuery?.metadata,
+            guild_id: data.query ? (data.query?.guild || data.query?.guild_id || data.query?.guildId || data.query?.metadata) : null,
         };
 
         Logger.info(`Received ${mappedData.type} from ${mappedData.user_id} for ${mappedData.entity_type} ${mappedData.entity_id}`, 'TOPGG');
