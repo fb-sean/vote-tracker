@@ -20,12 +20,13 @@ const TemporaryRoleSchema = new Schema(
         },
     },
     {
+        autoIndex: false,
         versionKey: false,
         timestamps: true,
     }
 );
 
-TemporaryRoleSchema.index({expires_at: 1}, {expireAfterSeconds: 0});
+TemporaryRoleSchema.index({expires_at: 1});
 
 export type TemporaryRole = InferSchemaType<typeof TemporaryRoleSchema> & { _id: Types.ObjectId };
 
