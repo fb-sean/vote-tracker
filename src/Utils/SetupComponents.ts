@@ -10,6 +10,7 @@ import {TSetupState} from "@Utils/SetupManager";
 import {TopggConnection} from "@Schemas/Integrations/Topgg";
 import {BrightImages} from "@Utils/BrightImages";
 import {successComponent} from "@Utils/Components";
+import {buildTopggAuthorizationStartUrl} from "@Utils/TopggOAuth";
 
 function msToReadable(ms) {
     const weeks = Math.floor(ms / (7 * 24 * 60 * 60 * 1000));
@@ -909,16 +910,6 @@ export function buildCompleteStep(setupId: string, state: TSetupState): RESTPost
     const entityType = state.entity_type || 'bot';
 
     const lists: APIComponentInMessageActionRow[] = [];
-    if (entityType === 'bot' || entityType === 'server' || entityType === 'game') {
-        lists.push({
-            type: ComponentType.Button,
-            style: ButtonStyle.Secondary,
-            label: 'Top.gg',
-            emoji: {name: 'botlisttopgg', id: '1472359122232934460'},
-            custom_id: `setup_platform_topgg_${setupId}`,
-        });
-    }
-
     if (entityType === 'bot' || entityType === 'server') {
         lists.push({
             type: ComponentType.Button,
@@ -982,6 +973,34 @@ export function buildCompleteStep(setupId: string, state: TSetupState): RESTPost
                         type: ComponentType.TextDisplay,
                         content: 'Select a voting platform to connect your webhook. Click on a platform to see detailed instructions.',
                     },
+                    ...(entityType === 'bot' || entityType === 'server' || entityType === 'game' ? [
+                        {
+                            type: ComponentType.TextDisplay,
+                            content: '**Top.gg**',
+                        },
+                        {
+                            type: ComponentType.ActionRow,
+                            components: [
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Link,
+                                    label: 'Top.gg',
+                                    emoji: {name: 'botlisttopgg', id: '1472359122232934460'},
+                                    url: buildTopggAuthorizationStartUrl(setupId),
+                                },
+                                {
+                                    type: ComponentType.Button,
+                                    style: ButtonStyle.Secondary,
+                                    label: 'I don\'t want to login',
+                                    custom_id: `setup_platform_topgg_manual_${setupId}`,
+                                }
+                            ],
+                        },
+                        {
+                            type: ComponentType.Separator,
+                            spacing: 1,
+                        },
+                    ] : []) as APIComponentInContainer[],
                     {
                         type: ComponentType.ActionRow,
                         components: [
@@ -1062,63 +1081,10 @@ export function buildCompleteStep(setupId: string, state: TSetupState): RESTPost
     };
 }
 
-export function buildPlatformTopGGGuide(setupId: string, state: TSetupState, webhookUrl: string, maskedToken: string, hasExistingConnection = false): RESTPostAPIChannelMessageJSONBody {
+export function buildPlatformTopGGGuide(setupId: string, state: TSetupState): RESTPostAPIChannelMessageJSONBody {
     const entityType = state.entity_type === 'bot' ? 'bot' : state.entity_type === 'server' ? 'servers' : 'roblox/games';
     const entityId = state.entity_id || '';
     const isGame = state.entity_type === 'game';
-
-    if (hasExistingConnection) {
-        return {
-            components: [
-                {
-                    type: ComponentType.Container,
-                    accent_color: 5763719,
-                    components: [
-                        {
-                            type: ComponentType.Section,
-                            accessory: {
-                                type: ComponentType.Thumbnail,
-                                media: {
-                                    url: BrightImages.ThumbsUp
-                                }
-                            },
-                            components: [
-                                {
-                                    type: ComponentType.TextDisplay,
-                                    content: '### Votes - Setup Wizard\n-# Platform Integration'
-                                },
-                                {
-                                    type: ComponentType.TextDisplay,
-                                    content: 'A top.gg connection for this entity already exists. Everything is set up and you\'re ready to go - no further action needed!'
-                                },
-                            ]
-                        },
-                        {
-                            type: ComponentType.Separator,
-                            spacing: 1,
-                        },
-                        {
-                            type: ComponentType.ActionRow,
-                            components: [
-                                {
-                                    type: ComponentType.Button,
-                                    style: ButtonStyle.Secondary,
-                                    label: 'Back',
-                                    custom_id: `setup_platform_back_${setupId}`,
-                                },
-                                {
-                                    type: ComponentType.Button,
-                                    style: ButtonStyle.Success,
-                                    label: 'Finish Setup',
-                                    custom_id: `setup_finish_${setupId}`,
-                                },
-                            ],
-                        }
-                    ]
-                }
-            ],
-        };
-    }
 
     return {
         components: [

@@ -39,7 +39,6 @@ import {
     buildVoteMessageModal,
 } from "@Utils/SetupComponents";
 import Redis from "@API/RedisCache";
-import TopggConnectionModel from "@Schemas/Integrations/Topgg";
 import {generateKey} from "@Utils/Key";
 import {refreshCurrentStep as listRefreshCurrentStep} from "@Handlers/ListHandlers";
 import {errorComponent, infoComponent, successComponent} from "@Utils/Components";
@@ -578,15 +577,7 @@ export async function handleSetupPlatformTopGG(ctx: Context, setupId: string) {
         return ctx.reply(errorComponent('Votes - Setup Wizard', 'Setup session expired. Please start over.'));
     }
 
-    const webhookUrl = `https://votes.discordbots.xyz/webhooks/top-gg/${state.auth_token}`;
-    const maskedToken = state.auth_token ? state.auth_token : '...';
-
-    const existingConnection = await TopggConnectionModel.findOne({
-        project_type: state.entity_type,
-        project_platform_id: state.entity_id,
-    });
-
-    return ctx.update(buildPayload(buildPlatformTopGGGuide(setupId, state, webhookUrl, maskedToken, !!existingConnection)));
+    return ctx.update(buildPayload(buildPlatformTopGGGuide(setupId, state)));
 }
 
 export async function handleSetupPlatformDiscordBotList(ctx: Context, setupId: string) {

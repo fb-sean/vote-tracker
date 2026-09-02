@@ -52,7 +52,7 @@ export class HttpClient {
 
             req.path = new URL(fullUrl, `https://${req.headers.host}`).pathname;
 
-            Logger.debug(`${method} ${fullUrl}`, 'HTTP');
+            Logger.debug(`${method} ${req.path}`, 'HTTP');
 
             if (method === 'POST' || method === 'PUT') {
                 try {

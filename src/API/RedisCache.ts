@@ -43,6 +43,28 @@ class Redis {
         return value as unknown as T;
     }
 
+    public async getAndDelete<T>(key: string): Promise<T | null> {
+        const value = await this._client.eval(
+            "local value = redis.call('GET', KEYS[1]); if value then redis.call('DEL', KEYS[1]); end; return value",
+            1,
+            key,
+        );
+
+        if (typeof value !== 'string' || !value) {
+            return null;
+        }
+
+        if (value.startsWith('[') || value.startsWith('{')) {
+            try {
+                return JSON.parse(value) as T;
+            } catch {
+                return value as unknown as T;
+            }
+        }
+
+        return value as unknown as T;
+    }
+
     public async set<T>(key: string, value: T, expireInSeconds: Nullable<number> = null): Promise<void> {
         const toStore = typeof value === 'object' ? JSON.stringify(value) : value;
 
