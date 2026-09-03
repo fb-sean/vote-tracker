@@ -63,6 +63,7 @@ export default class TopggCallbackRoute implements TRoute {
                 : error instanceof Error ? error.message : 'Unknown error';
 
             Logger.error(`Top.gg OAuth setup failed: ${topggError}`, 'TOPGG_OAUTH');
+            console.log(error);
 
             return Response(res, 'Top.gg could not connect the Votes integration. Return to Discord and try again or use the manual setup guide.', 502);
         }
