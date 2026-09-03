@@ -73,7 +73,7 @@ export async function createTopggAuthorizationUrl(setupId: string, setupState: T
     authorizationUrl.searchParams.set('code_challenge', codeChallenge);
     authorizationUrl.searchParams.set('code_challenge_method', 'S256');
     authorizationUrl.searchParams.set('project', 'discord');
-    authorizationUrl.searchParams.set('project_id', setupState.entity_id);
+    authorizationUrl.searchParams.set('platform_id', setupState.entity_id);
 
     return authorizationUrl.toString();
 }
